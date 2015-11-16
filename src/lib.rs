@@ -3000,7 +3000,7 @@ pub struct stbrp_node
 }
 
 #[allow(dead_code)]
-pub struct stbrp_rect
+pub struct Rect
 {
     x: stbrp_coord,
     y: stbrp_coord,
@@ -3028,7 +3028,7 @@ pub unsafe fn stbrp_init_target(
 
 pub unsafe fn stbrp_pack_rects(
     con: *mut stbrp_context,
-    rects: *mut stbrp_rect,
+    rects: *mut Rect,
     num_rects: isize
 ) {
    for i in 0..num_rects {
@@ -3310,7 +3310,7 @@ pub unsafe fn pack_font_ranges_gather_rects(
     info: *mut stbtt_fontinfo,
     ranges: *mut stbtt_pack_range,
     num_ranges: isize,
-    rects: *mut stbrp_rect
+    rects: *mut Rect
 ) -> isize {
    let mut k: isize;
 
@@ -3352,7 +3352,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
     info: *mut stbtt_fontinfo,
     ranges: *mut stbtt_pack_range,
     num_ranges: isize,
-    rects: *mut stbrp_rect
+    rects: *mut Rect
 ) -> isize {
    let mut k: isize;
    let mut return_value: isize = 1;
@@ -3378,7 +3378,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
       sub_x = oversample_shift((*spc).h_oversample as isize);
       sub_y = oversample_shift((*spc).v_oversample as isize);
       for j in 0..(*ranges.offset(i)).num_chars {
-         let r: *mut stbrp_rect = rects.offset(k);
+         let r: *mut Rect = rects.offset(k);
          if ((*r).was_packed != 0) {
             let bc: *mut stbtt_packedchar = (*ranges.offset(i)).chardata_for_range.offset(j);
             let mut advance: isize = 0;
@@ -3454,7 +3454,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
 
 pub unsafe fn pack_font_ranges_pack_rects(
     spc: *mut stbtt_pack_context,
-    rects: *mut stbrp_rect,
+    rects: *mut Rect,
     num_rects: isize)
 {
    stbrp_pack_rects((*spc).pack_info as *mut stbrp_context, rects, num_rects);
@@ -3489,7 +3489,7 @@ pub unsafe fn pack_font_ranges(
    };
    let mut n: isize;
    //stbrp_context *context = (stbrp_context *) spc->pack_info;
-   let rects: *mut stbrp_rect;
+   let rects: *mut Rect;
 
    // flag all characters as NOT packed
    for i in 0..num_ranges {
@@ -3506,8 +3506,8 @@ pub unsafe fn pack_font_ranges(
       n += (*ranges.offset(i)).num_chars;
    }
 
-   rects = STBTT_malloc!(size_of::<stbrp_rect>() * n as usize)
-        as *mut stbrp_rect;
+   rects = STBTT_malloc!(size_of::<Rect>() * n as usize)
+        as *mut Rect;
    if rects == null_mut() {
       return 0;
    }

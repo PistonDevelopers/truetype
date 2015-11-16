@@ -2999,6 +2999,7 @@ pub struct stbrp_node
    x: u8,
 }
 
+#[allow(dead_code)]
 pub struct stbrp_rect
 {
     x: stbrp_coord,
@@ -3013,8 +3014,8 @@ pub unsafe fn stbrp_init_target(
     con: *mut stbrp_context,
     pw: isize,
     ph: isize,
-    nodes: *mut stbrp_node,
-    num_nodes: isize
+    _nodes: *mut stbrp_node,
+    _num_nodes: isize
 ) {
    (*con).width  = pw;
    (*con).height = ph;
@@ -3030,7 +3031,6 @@ pub unsafe fn stbrp_pack_rects(
     rects: *mut stbrp_rect,
     num_rects: isize
 ) {
-   let i: isize;
    for i in 0..num_rects {
       if ((*con).x + (*rects.offset(i)).w > (*con).width) {
          (*con).x = 0;
@@ -3069,7 +3069,7 @@ pub unsafe fn stbrp_pack_rects(
 // bilinear filtering).
 //
 // Returns 0 on failure, 1 on success.
-pub unsafe fn stbtt_PackBegin(
+pub unsafe fn pack_begin(
     spc: *mut stbtt_pack_context,
     pixels: *mut u8,
     pw: isize,
@@ -3112,7 +3112,7 @@ pub unsafe fn stbtt_PackBegin(
 }
 
 // Cleans up the packing context and frees all memory.
-pub unsafe fn stbtt_PackEnd(spc: *mut stbtt_pack_context)
+pub unsafe fn pack_end(spc: *mut stbtt_pack_context)
 {
    STBTT_free!((*spc).nodes);
    STBTT_free!((*spc).pack_info);
@@ -3132,7 +3132,7 @@ pub unsafe fn stbtt_PackEnd(spc: *mut stbtt_pack_context)
 //
 // To use with PackFontRangesGather etc., you must set it before calls
 // call to PackFontRangesGatherRects.
-pub unsafe fn stbtt_PackSetOversampling(
+pub unsafe fn pack_set_oversampling(
     spc: *mut stbtt_pack_context,
     h_oversample: usize,
     v_oversample: usize)
@@ -3149,7 +3149,7 @@ pub unsafe fn stbtt_PackSetOversampling(
 
 const STBTT__OVER_MASK: usize = (STBTT_MAX_OVERSAMPLE-1);
 
-pub unsafe fn stbtt__h_prefilter(
+pub unsafe fn h_prefilter(
     mut pixels: *mut u8,
     w: isize,
     h: isize,
@@ -3158,9 +3158,7 @@ pub unsafe fn stbtt__h_prefilter(
 ) {
    let mut buffer: [u8; STBTT_MAX_OVERSAMPLE] = [0; STBTT_MAX_OVERSAMPLE];
    let safe_w: isize = w - kernel_width as isize;
-   let j: isize;
-   for j in 0..h {
-      let i: isize;
+   for _ in 0..h {
       let mut total: usize;
       STBTT_memset(&buffer[0] as *const _ as *const c_void, 0, kernel_width);
 
@@ -3215,7 +3213,7 @@ pub unsafe fn stbtt__h_prefilter(
    }
 }
 
-pub unsafe fn stbtt__v_prefilter(
+pub unsafe fn v_prefilter(
     mut pixels: *mut u8,
     w: isize,
     h: isize,
@@ -3224,9 +3222,7 @@ pub unsafe fn stbtt__v_prefilter(
 ) {
    let mut buffer: [u8; STBTT_MAX_OVERSAMPLE] = [0; STBTT_MAX_OVERSAMPLE];
    let safe_h: isize = h - kernel_width as isize;
-   let j: isize;
-   for j in 0..w {
-      let i: isize;
+   for _ in 0..w {
       let mut total: usize;
       STBTT_memset(&buffer[0] as *const _ as *const c_void, 0, kernel_width);
 
@@ -3281,7 +3277,7 @@ pub unsafe fn stbtt__v_prefilter(
    }
 }
 
-pub fn stbtt__oversample_shift(oversample: isize) -> f32
+pub fn oversample_shift(oversample: isize) -> f32
 {
    if oversample == 0 {
       return 0.0;
@@ -3309,15 +3305,13 @@ pub fn stbtt__oversample_shift(oversample: isize) -> f32
 // (or it may not).
 
 // rects array must be big enough to accommodate all characters in the given ranges
-pub unsafe fn stbtt_PackFontRangesGatherRects(
+pub unsafe fn pack_font_ranges_gather_rects(
     spc: *mut stbtt_pack_context,
     info: *mut stbtt_fontinfo,
     ranges: *mut stbtt_pack_range,
     num_ranges: isize,
     rects: *mut stbrp_rect
 ) -> isize {
-   let i: isize;
-   let j: isize;
    let mut k: isize;
 
    k=0;
@@ -3353,15 +3347,13 @@ pub unsafe fn stbtt_PackFontRangesGatherRects(
 }
 
 // rects array must be big enough to accommodate all characters in the given ranges
-pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
+pub unsafe fn pack_font_ranges_render_into_rects(
     spc: *mut stbtt_pack_context,
     info: *mut stbtt_fontinfo,
     ranges: *mut stbtt_pack_range,
     num_ranges: isize,
     rects: *mut stbrp_rect
 ) -> isize {
-   let i: isize;
-   let j: isize;
    let mut k: isize;
    let mut return_value: isize = 1;
 
@@ -3383,8 +3375,8 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
       (*spc).v_oversample = (*ranges.offset(i)).v_oversample as usize;
       recip_h = 1.0 / (*spc).h_oversample as f32;
       recip_v = 1.0 / (*spc).v_oversample as f32;
-      sub_x = stbtt__oversample_shift((*spc).h_oversample as isize);
-      sub_y = stbtt__oversample_shift((*spc).v_oversample as isize);
+      sub_x = oversample_shift((*spc).h_oversample as isize);
+      sub_y = oversample_shift((*spc).v_oversample as isize);
       for j in 0..(*ranges.offset(i)).num_chars {
          let r: *mut stbrp_rect = rects.offset(k);
          if ((*r).was_packed != 0) {
@@ -3425,13 +3417,13 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
                                           glyph);
 
             if (*spc).h_oversample > 1 {
-               stbtt__h_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
+               h_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
                                   (*r).w, (*r).h, (*spc).stride_in_bytes,
                                   (*spc).h_oversample);
             }
 
             if (*spc).v_oversample > 1 {
-               stbtt__v_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
+               v_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
                                   (*r).w, (*r).h, (*spc).stride_in_bytes,
                                   (*spc).v_oversample);
             }
@@ -3460,7 +3452,7 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
    return return_value;
 }
 
-pub unsafe fn stbtt_PackFontRangesPackRects(
+pub unsafe fn pack_font_ranges_pack_rects(
     spc: *mut stbtt_pack_context,
     rects: *mut stbrp_rect,
     num_rects: isize)
@@ -3472,7 +3464,7 @@ pub unsafe fn stbtt_PackFontRangesPackRects(
 // ranges. This will usually create a better-packed bitmap than multiple
 // calls to stbtt_PackFontRange. Note that you can call this multiple
 // times within a single PackBegin/PackEnd.
-pub unsafe fn stbtt_PackFontRanges(
+pub unsafe fn pack_font_ranges(
     spc: *mut stbtt_pack_context,
     fontdata: *mut u8,
     font_index: isize,
@@ -3495,10 +3487,7 @@ pub unsafe fn stbtt_PackFontRanges(
       index_map: 0,
       indexToLocFormat: 0,
    };
-   let i: isize;
-   let j: isize;
    let mut n: isize;
-   let mut return_value: isize = 1;
    //stbrp_context *context = (stbrp_context *) spc->pack_info;
    let rects: *mut stbrp_rect;
 
@@ -3525,11 +3514,11 @@ pub unsafe fn stbtt_PackFontRanges(
 
    stbtt_InitFont(&mut info, fontdata, stbtt_GetFontOffsetForIndex(fontdata,font_index) as isize);
 
-   n = stbtt_PackFontRangesGatherRects(spc, &mut info, ranges, num_ranges, rects);
+   n = pack_font_ranges_gather_rects(spc, &mut info, ranges, num_ranges, rects);
 
-   stbtt_PackFontRangesPackRects(spc, rects, n);
+   pack_font_ranges_pack_rects(spc, rects, n);
 
-   return_value = stbtt_PackFontRangesRenderIntoRects(spc, &mut info, ranges, num_ranges, rects);
+   let return_value = pack_font_ranges_render_into_rects(spc, &mut info, ranges, num_ranges, rects);
 
    STBTT_free!(rects as *mut c_void);
    return return_value;
@@ -3547,7 +3536,7 @@ pub unsafe fn stbtt_PackFontRanges(
 // and pass that result as 'font_size':
 //       ...,                  20 , ... // font max minus min y is 20 pixels tall
 //       ..., STBTT_POINT_SIZE(20), ... // 'M' is 20 pixels tall
-pub unsafe fn stbtt_PackFontRange(
+pub unsafe fn pack_font_range(
     spc: *mut stbtt_pack_context,
     fontdata: *mut u8,
     font_index: isize,
@@ -3565,10 +3554,10 @@ pub unsafe fn stbtt_PackFontRange(
        v_oversample: 0,
        h_oversample: 0,
    };
-   return stbtt_PackFontRanges(spc, fontdata, font_index, &mut range, 1);
+   return pack_font_ranges(spc, fontdata, font_index, &mut range, 1);
 }
 
-pub unsafe fn stbtt_GetPackedQuad(
+pub unsafe fn get_packed_quad(
     chardata: *mut stbtt_packedchar,
     pw: isize,
     ph: isize,
@@ -3614,7 +3603,7 @@ pub unsafe fn stbtt_GetPackedQuad(
 //
 
 // check if a utf8 string contains a prefix which is the utf16 string; if so return length of matching utf8 string
-pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
+pub unsafe fn compare_utf8_to_utf16_bigendian_prefix(
     s1: *const stbtt_uint8,
     len1: stbtt_int32,
     mut s2: *const stbtt_uint8,
@@ -3675,7 +3664,7 @@ pub unsafe fn compare_utf8_to_utf16_bigendian(
     s2: *const u8,
     len2: isize
 ) -> isize {
-   return (len1 == stbtt__CompareUTF8toUTF16_bigendian_prefix(
+   return (len1 == compare_utf8_to_utf16_bigendian_prefix(
        s1 as *const stbtt_uint8, len1 as i32, s2 as *const stbtt_uint8, len2 as i32) as isize) as isize;
 }
 
@@ -3742,7 +3731,7 @@ pub unsafe fn matchpair(
             let mut off: stbtt_int32 = ttUSHORT!(fc.offset(loc as isize +10)) as i32;
 
             // check if there's a prefix match
-            let mut matchlen: stbtt_int32 = stbtt__CompareUTF8toUTF16_bigendian_prefix(
+            let mut matchlen: stbtt_int32 = compare_utf8_to_utf16_bigendian_prefix(
                 name, nlen, fc.offset(string_offset as isize + off as isize),slen);
             if (matchlen >= 0) {
                // check for target_id+1 immediately following, with same encoding & language

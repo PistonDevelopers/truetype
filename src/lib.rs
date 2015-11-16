@@ -3639,7 +3639,7 @@ pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
          let c: stbtt_uint32;
          let ch2: stbtt_uint16 = (*s2.offset(2)*256 + *s2.offset(3)) as u16;
          if i+3 >= len1 { return -1; }
-         c = (((ch - 0xd800) << 10) + (ch2 - 0xdc00) + 0x10000) as u32;
+         c = ((ch - 0xd800) << 10) as u32 + (ch2 - 0xdc00) as u32 + 0x10000;
          if *s1.offset(i as isize) != (0xf0 + (c >> 18)) as u8 { return -1; }
          i += 1;
          if *s1.offset(i as isize) != (0x80 + ((c >> 12) & 0x3f)) as u8 { return -1; }

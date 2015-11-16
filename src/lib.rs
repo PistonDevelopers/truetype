@@ -2985,7 +2985,7 @@ type stbrp_coord = isize;
 //                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////
 
-pub struct stbrp_context
+pub struct Context
 {
    width: isize,
    height: isize,
@@ -3012,7 +3012,7 @@ pub struct Rect
 }
 
 pub unsafe fn stbrp_init_target(
-    con: *mut stbrp_context,
+    con: *mut Context,
     pw: isize,
     ph: isize,
     _nodes: *mut Node,
@@ -3028,7 +3028,7 @@ pub unsafe fn stbrp_init_target(
 }
 
 pub unsafe fn stbrp_pack_rects(
-    con: *mut stbrp_context,
+    con: *mut Context,
     rects: *mut Rect,
     num_rects: isize
 ) {
@@ -3080,8 +3080,8 @@ pub unsafe fn pack_begin(
     alloc_context: *const ()
 ) -> isize
 {
-   let context: *mut stbrp_context = STBTT_malloc!(
-       size_of::<stbrp_context>()) as *mut stbrp_context;
+   let context: *mut Context = STBTT_malloc!(
+       size_of::<Context>()) as *mut Context;
    let num_nodes: isize = pw - padding;
    let nodes: *mut Node = STBTT_malloc!(
        size_of::<Node>() * num_nodes as usize) as *mut Node;
@@ -3458,7 +3458,7 @@ pub unsafe fn pack_font_ranges_pack_rects(
     rects: *mut Rect,
     num_rects: isize)
 {
-   stbrp_pack_rects((*spc).pack_info as *mut stbrp_context, rects, num_rects);
+   stbrp_pack_rects((*spc).pack_info as *mut Context, rects, num_rects);
 }
 
 // Creates character bitmaps from multiple ranges of characters stored in

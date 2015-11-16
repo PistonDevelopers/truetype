@@ -2995,7 +2995,7 @@ pub struct stbrp_context
 }
 
 #[allow(dead_code)]
-pub struct stbrp_node
+pub struct Node
 {
    x: u8,
 }
@@ -3015,7 +3015,7 @@ pub unsafe fn stbrp_init_target(
     con: *mut stbrp_context,
     pw: isize,
     ph: isize,
-    _nodes: *mut stbrp_node,
+    _nodes: *mut Node,
     _num_nodes: isize
 ) {
    (*con).width  = pw;
@@ -3083,8 +3083,8 @@ pub unsafe fn pack_begin(
    let context: *mut stbrp_context = STBTT_malloc!(
        size_of::<stbrp_context>()) as *mut stbrp_context;
    let num_nodes: isize = pw - padding;
-   let nodes: *mut stbrp_node = STBTT_malloc!(
-       size_of::<stbrp_node>() * num_nodes as usize) as *mut stbrp_node;
+   let nodes: *mut Node = STBTT_malloc!(
+       size_of::<Node>() * num_nodes as usize) as *mut Node;
 
    if context == null_mut() || nodes == null_mut() {
       if context != null_mut() { STBTT_free!(context as *mut c_void); }

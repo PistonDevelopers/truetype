@@ -519,7 +519,7 @@ const STBTT_MACSTYLE_ITALIC: u8 = 2;
 const STBTT_MACSTYLE_UNDERSCORE: u8 = 4;
 const STBTT_MACSTYLE_NONE: u8 = 8;   // <= not same as 0, this makes us check the bitfield is 0
 
-enum STBTT_PLATFORM_ID { // platformID
+enum STBTT_PLATFORM_ID { // platform_id
    UNICODE   =0,
    MAC       =1,
    ISO       =2,
@@ -538,7 +538,7 @@ impl From<u16> for STBTT_PLATFORM_ID {
     }
 }
 
-enum STBTT_UNICODE_EID { // encodingID for STBTT_PLATFORM_ID_UNICODE
+enum STBTT_UNICODE_EID { // encoding_id for STBTT_PLATFORM_ID_UNICODE
    UNICODE_1_0    =0,
    UNICODE_1_1    =1,
    ISO_10646      =2,
@@ -546,7 +546,7 @@ enum STBTT_UNICODE_EID { // encodingID for STBTT_PLATFORM_ID_UNICODE
    UNICODE_2_0_FULL=4
 }
 
-enum STBTT_MS_EID { // encodingID for STBTT_PLATFORM_ID_MICROSOFT
+enum STBTT_MS_EID { // encoding_id for STBTT_PLATFORM_ID_MICROSOFT
    SYMBOL        =0,
    UNICODE_BMP   =1,
    SHIFTJIS      =2,
@@ -565,14 +565,14 @@ impl From<u16> for STBTT_MS_EID {
     }
 }
 
-enum STBTT_MAC_EID { // encodingID for STBTT_PLATFORM_ID_MAC; same as Script Manager codes
+enum STBTT_MAC_EID { // encoding_id for STBTT_PLATFORM_ID_MAC; same as Script Manager codes
    ROMAN        =0,   ARABIC       =4,
    JAPANESE     =1,   HEBREW       =5,
    CHINESE_TRAD =2,   GREEK        =6,
    KOREAN       =3,   RUSSIAN      =7
 }
 
-enum STBTT_MS_LANG { // languageID for STBTT_PLATFORM_ID_MICROSOFT; same as LCID...
+enum STBTT_MS_LANG { // language_id for STBTT_PLATFORM_ID_MICROSOFT; same as LCID...
        // problematic because there are e.g. 16 english LCIDs and 16 arabic LCIDs
    ENGLISH     =0x0409,   ITALIAN     =0x0410,
    CHINESE     =0x0804,   JAPANESE    =0x0411,
@@ -582,7 +582,7 @@ enum STBTT_MS_LANG { // languageID for STBTT_PLATFORM_ID_MICROSOFT; same as LCID
    HEBREW      =0x040d,   SWEDISH     =0x041D
 }
 
-enum STBTT_MAC_LANG { // languageID for STBTT_PLATFORM_ID_MAC
+enum STBTT_MAC_LANG { // language_id for STBTT_PLATFORM_ID_MAC
    ENGLISH      =0 ,   JAPANESE     =11,
    ARABIC       =12,   KOREAN       =23,
    DUTCH        =4 ,   RUSSIAN      =32,
@@ -3669,7 +3669,7 @@ pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
 
 // returns 1/0 whether the first string interpreted as utf8 is identical to
 // the second string interpreted as big-endian utf16... useful for strings from next func
-pub unsafe fn stbtt_CompareUTF8toUTF16_bigendian(
+pub unsafe fn compare_utf8_to_utf16_bigendian(
     s1: *const u8,
     len1: isize,
     s2: *const u8,
@@ -3688,36 +3688,35 @@ pub unsafe fn stbtt_CompareUTF8toUTF16_bigendian(
 //
 // returns results in whatever encoding you request... but note that 2-byte encodings
 // will be BIG-ENDIAN... use stbtt_CompareUTF8toUTF16_bigendian() to compare
-pub unsafe fn stbtt_GetFontNameString(
+pub unsafe fn get_font_name_string(
     font: *const stbtt_fontinfo,
     length: *mut isize,
-    platformID: isize,
-    encodingID: isize,
-    languageID: isize,
-    nameID: isize
+    platform_id: isize,
+    encoding_id: isize,
+    language_id: isize,
+    name_id: isize
 ) -> *const u8 {
-   let i: stbtt_int32;
    let count: stbtt_int32;
-   let stringOffset: stbtt_int32;
+   let string_offset: stbtt_int32;
    let fc: *const stbtt_uint8 = (*font).data;
    let offset: stbtt_uint32 = (*font).fontstart as u32;
    let nm: stbtt_uint32 = stbtt__find_table(fc, offset, CString::new("name").unwrap().as_ptr());
    if nm == 0 { return null(); }
 
    count = ttUSHORT!(fc.offset(nm as isize +2)) as i32;
-   stringOffset = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
+   string_offset = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
    for i in 0..count as u32 {
       let loc: stbtt_uint32 = nm + 6 + 12 * i;
-      if (platformID == ttUSHORT!(fc.offset(loc as isize +0)) as isize && encodingID == ttUSHORT!(fc.offset(loc as isize +2)) as isize
-          && languageID == ttUSHORT!(fc.offset(loc as isize +4)) as isize && nameID == ttUSHORT!(fc.offset(loc as isize +6)) as isize) {
+      if (platform_id == ttUSHORT!(fc.offset(loc as isize +0)) as isize && encoding_id == ttUSHORT!(fc.offset(loc as isize +2)) as isize
+          && language_id == ttUSHORT!(fc.offset(loc as isize +4)) as isize && name_id == ttUSHORT!(fc.offset(loc as isize +6)) as isize) {
          *length = ttUSHORT!(fc.offset(loc as isize +8)) as isize;
-         return (fc.offset(stringOffset as isize +ttUSHORT!(fc.offset(loc as isize +10)) as isize)) as *const u8;
+         return (fc.offset(string_offset as isize +ttUSHORT!(fc.offset(loc as isize +10)) as isize)) as *const u8;
       }
    }
    return null();
 }
 
-pub unsafe fn stbtt__matchpair(
+pub unsafe fn matchpair(
     fc: *mut stbtt_uint8,
     nm: stbtt_uint32,
     name: *mut stbtt_uint8,
@@ -3725,9 +3724,8 @@ pub unsafe fn stbtt__matchpair(
     target_id: stbtt_int32,
     next_id: stbtt_int32
 ) -> isize {
-    let i: stbtt_int32;
     let count: stbtt_uint32 = ttUSHORT!(fc.offset(nm as isize +2)) as u32;
-    let stringOffset: stbtt_int32 = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
+    let string_offset: stbtt_int32 = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
 
    for i in 0..count as u32 {
       let loc: stbtt_uint32 = nm + 6 + 12 * i;
@@ -3745,7 +3743,7 @@ pub unsafe fn stbtt__matchpair(
 
             // check if there's a prefix match
             let mut matchlen: stbtt_int32 = stbtt__CompareUTF8toUTF16_bigendian_prefix(
-                name, nlen, fc.offset(stringOffset as isize + off as isize),slen);
+                name, nlen, fc.offset(string_offset as isize + off as isize),slen);
             if (matchlen >= 0) {
                // check for target_id+1 immediately following, with same encoding & language
                if (i+1 < count && ttUSHORT!(fc.offset(loc as isize +12+6)) == next_id as u16
@@ -3760,9 +3758,9 @@ pub unsafe fn stbtt__matchpair(
                      }
                   } else if (matchlen < nlen && *name.offset(matchlen as isize) == ' ' as u8) {
                      matchlen += 1;
-                     if (stbtt_CompareUTF8toUTF16_bigendian(
+                     if (compare_utf8_to_utf16_bigendian(
                          (name.offset(matchlen as isize)) as *mut u8, (nlen - matchlen) as isize,
-                         (fc.offset(stringOffset as isize + off as isize)) as *mut u8,slen as isize) != 0) {
+                         (fc.offset(string_offset as isize + off as isize)) as *mut u8,slen as isize) != 0) {
                         return 1;
                     }
                   }
@@ -3781,7 +3779,7 @@ pub unsafe fn stbtt__matchpair(
    return 0;
 }
 
-pub unsafe fn stbtt__matches(
+pub unsafe fn matches(
     fc: *mut stbtt_uint8,
     offset: stbtt_uint32,
     name: *mut stbtt_uint8,
@@ -3803,13 +3801,13 @@ pub unsafe fn stbtt__matches(
 
    if (flags != 0) {
       // if we checked the macStyle flags, then just check the family and ignore the subfamily
-      if (stbtt__matchpair(fc, nm, name, nlen, 16, -1) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  1, -1) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
+      if (matchpair(fc, nm, name, nlen, 16, -1) != 0) { return 1; }
+      if (matchpair(fc, nm, name, nlen,  1, -1) != 0) { return 1; }
+      if (matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
    } else {
-      if (stbtt__matchpair(fc, nm, name, nlen, 16, 17) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  1,  2) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
+      if (matchpair(fc, nm, name, nlen, 16, 17) != 0) { return 1; }
+      if (matchpair(fc, nm, name, nlen,  1,  2) != 0) { return 1; }
+      if (matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
    }
 
    return 0;
@@ -3819,16 +3817,15 @@ pub unsafe fn stbtt__matches(
 //   if you use STBTT_MACSTYLE_DONTCARE, use a font name like "Arial Bold".
 //   if you use any other flag, use a font name like "Arial"; this checks
 //     the 'macStyle' header field; i don't know if fonts set this consistently
-pub unsafe fn stbtt_FindMatchingFont(
+pub unsafe fn find_matching_font(
     font_collection: *const u8,
     name_utf8: *const u8,
     flags: stbtt_int32
 ) -> i32 {
-   let i: stbtt_int32;
    for i in 0.. {
       let off: stbtt_int32 = stbtt_GetFontOffsetForIndex(font_collection, i);
       if off < 0 { return off; }
-      if (stbtt__matches(font_collection as *mut stbtt_uint8,
+      if (matches(font_collection as *mut stbtt_uint8,
             off as stbtt_uint32, name_utf8 as *mut stbtt_uint8, flags) != 0) {
          return off;
       }
@@ -3858,7 +3855,7 @@ pub unsafe fn stbtt_FindMatchingFont(
 //                        non-oversampled; STBTT_POINT_SIZE for packed case only
 //   1.00 (2014-12-06) add new PackBegin etc. API, w/ support for oversampling
 //   0.99 (2014-09-18) fix multiple bugs with subpixel rendering (ryg)
-//   0.9  (2014-08-07) support certain mac/iOS fonts without an MS platformID
+//   0.9  (2014-08-07) support certain mac/iOS fonts without an MS platform_id
 //   0.8b (2014-07-07) fix a warning
 //   0.8  (2014-05-25) fix a few more warnings
 //   0.7  (2013-09-25) bugfix: subpixel glyph bug fixed in 0.5 had come back

@@ -3624,7 +3624,7 @@ pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
 
    // convert utf16 to utf8 and compare the results while converting
    while (len2 != 0) {
-      let ch: stbtt_uint16 = (*s2.offset(0)*256 + *s2.offset(1)) as u16;
+      let ch: stbtt_uint16 = (*s2.offset(0) as u16 *256 + *s2.offset(1) as u16);
       if (ch < 0x80) {
          if i >= len1 { return -1; }
          if *s1.offset(i as isize) != ch as u8 { return -1; }
@@ -3637,7 +3637,7 @@ pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
          i += 1;
       } else if (ch >= 0xd800 && ch < 0xdc00) {
          let c: stbtt_uint32;
-         let ch2: stbtt_uint16 = (*s2.offset(2)*256 + *s2.offset(3)) as u16;
+         let ch2: stbtt_uint16 = (*s2.offset(2) as u16 *256 + *s2.offset(3) as u16);
          if i+3 >= len1 { return -1; }
          c = ((ch - 0xd800) << 10) as u32 + (ch2 - 0xdc00) as u32 + 0x10000;
          if *s1.offset(i as isize) != (0xf0 + (c >> 18)) as u8 { return -1; }

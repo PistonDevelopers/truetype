@@ -2496,7 +2496,7 @@ pub unsafe fn stbtt__tesselate_curve(
 }
 
 // returns number of contours
-pub unsafe fn stbtt_FlattenCurves(
+pub unsafe fn flatten_curves(
     vertices: *mut stbtt_vertex,
     num_verts: isize,
     objspace_flatness: f32,
@@ -2589,7 +2589,7 @@ pub unsafe fn stbtt_FlattenCurves(
 }
 
 // rasterize a shape with quadratic beziers into a bitmap
-pub unsafe fn stbtt_Rasterize(
+pub unsafe fn rasterize(
     // 1-channel bitmap to draw into
     result: *mut stbtt__bitmap,
     // allowable error of curve in pixels
@@ -2615,7 +2615,7 @@ pub unsafe fn stbtt_Rasterize(
    let scale: f32 = if scale_x > scale_y { scale_y } else { scale_x };
    let mut winding_count: isize = 0;
    let mut winding_lengths: *mut isize = null_mut();
-   let windings: *mut stbtt__point = stbtt_FlattenCurves(vertices, num_verts,
+   let windings: *mut stbtt__point = flatten_curves(vertices, num_verts,
        flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count, userdata);
    if windings != null_mut() {
       stbtt__rasterize(result, windings, winding_lengths, winding_count,
@@ -2626,12 +2626,12 @@ pub unsafe fn stbtt_Rasterize(
 }
 
 // frees the bitmap allocated below
-pub unsafe fn stbtt_FreeBitmap(bitmap: *mut u8, userdata: *const ())
+pub unsafe fn free_bitmap(bitmap: *mut u8, _userdata: *const ())
 {
    STBTT_free!(bitmap as *mut c_void);
 }
 
-pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
+pub unsafe fn get_glyph_bitmap_subpixel(
     info: *const stbtt_fontinfo,
     mut scale_x: f32,
     mut scale_y: f32,
@@ -2678,7 +2678,7 @@ pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
       if gbm.pixels != null_mut() {
          gbm.stride = gbm.w;
 
-         stbtt_Rasterize(&mut gbm, 0.35,
+         rasterize(&mut gbm, 0.35,
              vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0, iy0,
               1, (*info).userdata);
       }
@@ -2690,7 +2690,7 @@ pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
 // the following functions are equivalent to the above functions, but operate
 // on glyph indices instead of Unicode codepoints (for efficiency)
 
-pub unsafe fn stbtt_GetGlyphBitmap(
+pub unsafe fn get_glyph_bitmap(
     info: *const stbtt_fontinfo,
     scale_x: f32,
     scale_y: f32,
@@ -2700,11 +2700,11 @@ pub unsafe fn stbtt_GetGlyphBitmap(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *const u8 {
-   return stbtt_GetGlyphBitmapSubpixel(info, scale_x, scale_y,
+   return get_glyph_bitmap_subpixel(info, scale_x, scale_y,
        0.0, 0.0, glyph, width, height, xoff, yoff);
 }
 
-pub unsafe fn stbtt_MakeGlyphBitmapSubpixel(
+pub unsafe fn make_glyph_bitmap_subpixel(
     info: *const stbtt_fontinfo,
     output: *mut u8,
     out_w: isize,
@@ -2732,14 +2732,14 @@ pub unsafe fn stbtt_MakeGlyphBitmapSubpixel(
    };
 
    if gbm.w != 0 && gbm.h != 0 {
-      stbtt_Rasterize(&mut gbm, 0.35, vertices, num_verts,
+      rasterize(&mut gbm, 0.35, vertices, num_verts,
           scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1, (*info).userdata);
    }
 
    STBTT_free!(vertices as *mut c_void);
 }
 
-pub unsafe fn stbtt_MakeGlyphBitmap(
+pub unsafe fn make_glyph_bitmap(
     info: *const stbtt_fontinfo,
     output: *mut u8,
     out_w: isize,
@@ -2749,13 +2749,13 @@ pub unsafe fn stbtt_MakeGlyphBitmap(
     scale_y: f32,
     glyph: isize
 ) {
-   stbtt_MakeGlyphBitmapSubpixel(info, output, out_w, out_h,
+   make_glyph_bitmap_subpixel(info, output, out_w, out_h,
        out_stride, scale_x, scale_y, 0.0,0.0, glyph);
 }
 
 // the same as stbtt_GetCodepoitnBitmap, but you can specify a subpixel
 // shift for the character
-pub unsafe fn stbtt_GetCodepointBitmapSubpixel(
+pub unsafe fn get_codepoint_bitmap_subpixel(
     info: *const stbtt_fontinfo,
     scale_x: f32,
     scale_y: f32,
@@ -2767,13 +2767,13 @@ pub unsafe fn stbtt_GetCodepointBitmapSubpixel(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *mut u8 {
-   return stbtt_GetGlyphBitmapSubpixel(info, scale_x,
+   return get_glyph_bitmap_subpixel(info, scale_x,
        scale_y,shift_x,shift_y, stbtt_FindGlyphIndex(info,codepoint), width,height,xoff,yoff);
 }
 
 // same as stbtt_MakeCodepointBitmap, but you can specify a subpixel
 // shift for the character
-pub unsafe fn stbtt_MakeCodepointBitmapSubpixel(
+pub unsafe fn make_codepoint_bitmap_subpixel(
     info: *const stbtt_fontinfo,
     output: *mut u8,
     out_w: isize,
@@ -2785,7 +2785,7 @@ pub unsafe fn stbtt_MakeCodepointBitmapSubpixel(
     shift_y: f32,
     codepoint: isize
 ) {
-   stbtt_MakeGlyphBitmapSubpixel(info, output, out_w, out_h,
+   make_glyph_bitmap_subpixel(info, output, out_w, out_h,
        out_stride, scale_x, scale_y, shift_x, shift_y,
        stbtt_FindGlyphIndex(info,codepoint));
 }
@@ -2797,7 +2797,7 @@ pub unsafe fn stbtt_MakeCodepointBitmapSubpixel(
 // which is stored left-to-right, top-to-bottom.
 //
 // xoff/yoff are the offset it pixel space from the glyph origin to the top-left of the bitmap
-pub unsafe fn stbtt_GetCodepointBitmap(
+pub unsafe fn get_codepoint_bitmap(
     info: *const stbtt_fontinfo,
     scale_x: f32,
     scale_y: f32,
@@ -2807,7 +2807,7 @@ pub unsafe fn stbtt_GetCodepointBitmap(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *mut u8 {
-   return stbtt_GetCodepointBitmapSubpixel(info, scale_x, scale_y,
+   return get_codepoint_bitmap_subpixel(info, scale_x, scale_y,
        0.0,0.0, codepoint, width,height,xoff,yoff);
 }
 
@@ -2815,7 +2815,7 @@ pub unsafe fn stbtt_GetCodepointBitmap(
 // in the form of 'output', with row spacing of 'out_stride' bytes. the bitmap
 // is clipped to out_w/out_h bytes. Call stbtt_GetCodepointBitmapBox to get the
 // width and height and positioning info for it first.
-pub unsafe fn stbtt_MakeCodepointBitmap(
+pub unsafe fn make_codepoint_bitmap(
     info: *const stbtt_fontinfo,
     output: *mut u8,
     out_w: isize,
@@ -2825,7 +2825,7 @@ pub unsafe fn stbtt_MakeCodepointBitmap(
     scale_y: f32,
     codepoint: isize
 ) {
-   stbtt_MakeCodepointBitmapSubpixel(info, output, out_w, out_h,
+   make_codepoint_bitmap_subpixel(info, output, out_w, out_h,
        out_stride, scale_x, scale_y, 0.0,0.0, codepoint);
 }
 
@@ -2838,7 +2838,7 @@ pub unsafe fn stbtt_MakeCodepointBitmap(
 // if return is negative, returns the negative of the number of characters that fit
 // if return is 0, no characters fit and no rows were used
 // This uses a very crappy packing.
-pub unsafe fn stbtt_BakeFontBitmap(
+pub unsafe fn bake_font_bitmap(
     data: *mut u8, offset: isize,  // font location (use offset=0 for plain .ttf)
     pixel_height: f32,                     // height of font in pixels
     pixels: *mut u8, pw: isize, ph: isize,  // bitmap to be filled in
@@ -2849,7 +2849,6 @@ pub unsafe fn stbtt_BakeFontBitmap(
     let mut x: isize;
     let mut y: isize;
     let mut bottom_y: isize;
-    let i: isize;
     let mut f: stbtt_fontinfo = stbtt_fontinfo {
        userdata: null(),
        data: null_mut(),
@@ -2897,7 +2896,7 @@ pub unsafe fn stbtt_BakeFontBitmap(
       }
       STBTT_assert!(x+gw < pw);
       STBTT_assert!(y+gh < ph);
-      stbtt_MakeGlyphBitmap(&f, pixels.offset(x+y*pw), gw,gh,pw, scale,scale, g);
+      make_glyph_bitmap(&f, pixels.offset(x+y*pw), gw,gh,pw, scale,scale, g);
       (*chardata.offset(i)).x0 = x as stbtt_uint16;
       (*chardata.offset(i)).y0 = y as stbtt_uint16;
       (*chardata.offset(i)).x1 = (x + gw) as stbtt_uint16;
@@ -2922,7 +2921,7 @@ pub unsafe fn stbtt_BakeFontBitmap(
 // see discussion of "BASELINE" above.
 //
 // It's inefficient; you might want to c&p it and optimize it.
-pub unsafe fn stbtt_GetBakedQuad(
+pub unsafe fn get_baked_quad(
     chardata: *mut stbtt_bakedchar,
     pw: isize,
     ph: isize,
@@ -3407,7 +3406,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
                                     scale * (*spc).h_oversample as f32,
                                     scale * (*spc).v_oversample as f32,
                                     &mut x0,&mut y0,&mut x1,&mut y1);
-            stbtt_MakeGlyphBitmapSubpixel(info,
+            make_glyph_bitmap_subpixel(info,
                                           (*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
                                           (*r).w - (*spc).h_oversample as isize +1,
                                           (*r).h - (*spc).v_oversample as isize +1,

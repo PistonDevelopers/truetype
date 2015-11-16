@@ -2972,7 +2972,7 @@ macro_rules! STBTT__NOTUSED {
 // #define STBTT__NOTUSED(v)  (void)sizeof(v)
 // #endif
 
-type stbrp_coord = isize;
+type Coord = isize;
 
 ////////////////////////////////////////////////////////////////////////////////////
 //                                                                                //
@@ -3003,8 +3003,8 @@ pub struct Node
 #[allow(dead_code)]
 pub struct Rect
 {
-    x: stbrp_coord,
-    y: stbrp_coord,
+    x: Coord,
+    y: Coord,
     id: isize,
     w: isize,
     h: isize,
@@ -3338,8 +3338,8 @@ pub unsafe fn pack_font_ranges_gather_rects(
                                          scale * (*spc).v_oversample as f32,
                                          0.0,0.0,
                                          &mut x0,&mut y0,&mut x1,&mut y1);
-         (*rects.offset(k)).w = (x1-x0 + (*spc).padding as isize + (*spc).h_oversample as isize -1) as stbrp_coord;
-         (*rects.offset(k)).h = (y1-y0 + (*spc).padding as isize + (*spc).v_oversample as isize -1) as stbrp_coord;
+         (*rects.offset(k)).w = (x1-x0 + (*spc).padding as isize + (*spc).h_oversample as isize -1) as Coord;
+         (*rects.offset(k)).h = (y1-y0 + (*spc).padding as isize + (*spc).v_oversample as isize -1) as Coord;
          k += 1;
       }
    }
@@ -3395,7 +3395,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
                     (*(*ranges.offset(i)).array_of_unicode_codepoints.offset(j))
                 };
             let glyph: isize = stbtt_FindGlyphIndex(info, codepoint);
-            let pad: stbrp_coord = (*spc).padding as stbrp_coord;
+            let pad: Coord = (*spc).padding as Coord;
 
             // pad on left and top
             (*r).x += pad;

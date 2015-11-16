@@ -2994,6 +2994,7 @@ pub struct stbrp_context
    bottom_y: isize,
 }
 
+#[allow(dead_code)]
 pub struct stbrp_node
 {
    x: u8,

@@ -2530,6 +2530,7 @@ pub unsafe fn flatten_curves(
       return null_mut();
    }
 
+   'error: loop {
    // make two passes through the points so we don't need to realloc
    for pass in 0..2 {
       let mut x: f32=0.0;
@@ -2538,8 +2539,7 @@ pub unsafe fn flatten_curves(
          points = STBTT_malloc!(num_points as usize * size_of::<stbtt__point>())
             as *mut stbtt__point;
          if points == null_mut() {
-             // TODO: Goto.
-             // goto error
+             break 'error;
          };
       }
       num_points = 0;
@@ -2577,10 +2577,9 @@ pub unsafe fn flatten_curves(
       }
       *(*contour_lengths).offset(n) = num_points - start;
    }
-
    return points;
-   // TODO: Label.
-// error:
+   } // 'error
+
    STBTT_free!(points as *mut c_void);
    STBTT_free!(*contour_lengths as *mut c_void);
    *contour_lengths = null_mut();

@@ -2452,7 +2452,7 @@ pub unsafe fn stbtt__rasterize(
    STBTT_free!(e as *mut c_void);
 }
 
-pub unsafe fn stbtt__add_point(
+pub unsafe fn add_point(
     points: *mut stbtt__point,
     n: isize,
     x: f32,
@@ -2464,7 +2464,7 @@ pub unsafe fn stbtt__add_point(
 }
 
 // tesselate until threshhold p is happy... @TODO warped to compensate for non-linear stretching
-pub unsafe fn stbtt__tesselate_curve(
+pub unsafe fn tesselate_curve(
     points: *mut stbtt__point,
     num_points: *mut isize,
     x0: f32,
@@ -2486,10 +2486,10 @@ pub unsafe fn stbtt__tesselate_curve(
       return 1;
    }
    if (dx*dx+dy*dy > objspace_flatness_squared) { // half-pixel error allowed... need to be smaller if AA
-      stbtt__tesselate_curve(points, num_points, x0,y0, (x0+x1)/2.0,(y0+y1)/2.0, mx,my, objspace_flatness_squared,n+1);
-      stbtt__tesselate_curve(points, num_points, mx,my, (x1+x2)/2.0,(y1+y2)/2.0, x2,y2, objspace_flatness_squared,n+1);
+      tesselate_curve(points, num_points, x0,y0, (x0+x1)/2.0,(y0+y1)/2.0, mx,my, objspace_flatness_squared,n+1);
+      tesselate_curve(points, num_points, mx,my, (x1+x2)/2.0,(y1+y2)/2.0, x2,y2, objspace_flatness_squared,n+1);
    } else {
-      stbtt__add_point(points, *num_points,x2,y2);
+      add_point(points, *num_points,x2,y2);
       *num_points = *num_points+1;
    }
    return 1;
@@ -2502,16 +2502,14 @@ pub unsafe fn flatten_curves(
     objspace_flatness: f32,
     contour_lengths: *mut *mut isize,
     num_contours: *mut isize,
-    userdata: *const ()
+    _userdata: *const ()
 ) -> *mut stbtt__point {
     let mut points: *mut stbtt__point = null_mut();
     let mut num_points: isize =0;
 
    let objspace_flatness_squared: f32 = objspace_flatness * objspace_flatness;
-   let i: isize;
    let mut n: isize =0;
    let mut start: isize =0;
-   let pass: isize;
 
    // count how many "moves" there are to get the contour count
    for i in 0..num_verts {
@@ -2556,17 +2554,17 @@ pub unsafe fn flatten_curves(
 
                x = (*vertices.offset(i)).x as f32;
                y = (*vertices.offset(i)).y as f32;
-               stbtt__add_point(points, num_points, x,y);
+               add_point(points, num_points, x,y);
                num_points += 1;
             }
             STBTT_cmd::vline => {
                x = (*vertices.offset(i)).x as f32;
                y = (*vertices.offset(i)).y as f32;
-               stbtt__add_point(points, num_points, x, y);
+               add_point(points, num_points, x, y);
                num_points += 1;
             }
             STBTT_cmd::vcurve => {
-               stbtt__tesselate_curve(points, &mut num_points, x,y,
+               tesselate_curve(points, &mut num_points, x,y,
                                         (*vertices.offset(i)).cx as f32, (*vertices.offset(i)).cy as f32,
                                         (*vertices.offset(i)).x as f32,  (*vertices.offset(i)).y as f32,
                                         objspace_flatness_squared, 0);

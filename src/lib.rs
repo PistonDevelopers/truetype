@@ -2371,87 +2371,6 @@ pub struct stbtt__point
    y: f32,
 }
 
-pub unsafe fn stbtt__rasterize(
-    result: *mut stbtt__bitmap,
-    pts: *mut stbtt__point,
-    wcount: *mut isize,
-    windings: isize,
-    scale_x: f32,
-    scale_y: f32,
-    shift_x: f32,
-    shift_y: f32,
-    off_x: isize,
-    off_y: isize,
-    invert: isize,
-    userdata: *const ()
-) {
-   let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
-   let e: *mut stbtt__edge;
-   let mut n: isize;
-   let i: isize;
-   let mut j: isize;
-   let k: isize;
-   let mut m: isize;
-// TODO: Conditional compilation.
-// #if STBTT_RASTERIZER_VERSION == 1
-//    int vsubsample = result->h < 8 ? 15 : 5;
-// #elif STBTT_RASTERIZER_VERSION == 2
-   let vsubsample: isize = 1;
-// #else
-//   #error "Unrecognized value of STBTT_RASTERIZER_VERSION"
-// #endif
-   // vsubsample should divide 255 evenly; otherwise we won't reach full opacity
-
-   // now we have to blow out the windings into explicit edge lists
-   n = 0;
-   for i in 0..windings {
-      n = n + *wcount.offset(i);
-   }
-
-   e = STBTT_malloc!(size_of::<stbtt__edge>() * (n+1) as usize)
-        as *mut stbtt__edge; // add an extra one as a sentinel
-   if e == null_mut() { return };
-   n = 0;
-
-   m=0;
-   for i in 0..windings {
-      let p: *const stbtt__point = pts.offset(m);
-      m += *wcount.offset(i);
-      j = *wcount.offset(i)-1;
-      for k in 0..(*wcount.offset(i)) {
-          if k != 0 { j = k; }
-         let mut a: isize=k;
-         let mut b: isize =j;
-         // skip the edge if horizontal
-         if (*p.offset(j)).y == (*p.offset(k)).y {
-            continue;
-         }
-         // add edge from j to k to the list
-         (*e.offset(n)).invert = 0;
-         if if invert != 0 { (*p.offset(j)).y > (*p.offset(k)).y }
-            else { (*p.offset(j)).y < (*p.offset(k)).y } {
-            (*e.offset(n)).invert = 1;
-            a=j;
-            b=k;
-         }
-         (*e.offset(n)).x0 = (*p.offset(a)).x * scale_x + shift_x;
-         (*e.offset(n)).y0 = ((*p.offset(a)).y * y_scale_inv + shift_y) * vsubsample as f32;
-         (*e.offset(n)).x1 = (*p.offset(b)).x * scale_x + shift_x;
-         (*e.offset(n)).y1 = ((*p.offset(b)).y * y_scale_inv + shift_y) * vsubsample as f32;
-         n += 1;
-      }
-   }
-
-   // now sort the edges by their highest point (should snap to integer, and then by x)
-   //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
-   stbtt__sort_edges(e, n);
-
-   // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
-   stbtt__rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
-
-   STBTT_free!(e as *mut c_void);
-}
-
 pub unsafe fn add_point(
     points: *mut stbtt__point,
     n: isize,
@@ -2609,6 +2528,89 @@ pub unsafe fn rasterize(
     // context for to STBTT_MALLOC
     userdata: *const ()
 ) {
+
+    #[allow(non_snake_case)]
+    unsafe fn stbtt__rasterize(
+        result: *mut stbtt__bitmap,
+        pts: *mut stbtt__point,
+        wcount: *mut isize,
+        windings: isize,
+        scale_x: f32,
+        scale_y: f32,
+        shift_x: f32,
+        shift_y: f32,
+        off_x: isize,
+        off_y: isize,
+        invert: isize,
+        userdata: *const ()
+    ) {
+       let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
+       let e: *mut stbtt__edge;
+       let mut n: isize;
+       let i: isize;
+       let mut j: isize;
+       let k: isize;
+       let mut m: isize;
+    // TODO: Conditional compilation.
+    // #if STBTT_RASTERIZER_VERSION == 1
+    //    int vsubsample = result->h < 8 ? 15 : 5;
+    // #elif STBTT_RASTERIZER_VERSION == 2
+       let vsubsample: isize = 1;
+    // #else
+    //   #error "Unrecognized value of STBTT_RASTERIZER_VERSION"
+    // #endif
+       // vsubsample should divide 255 evenly; otherwise we won't reach full opacity
+
+       // now we have to blow out the windings into explicit edge lists
+       n = 0;
+       for i in 0..windings {
+          n = n + *wcount.offset(i);
+       }
+
+       e = STBTT_malloc!(size_of::<stbtt__edge>() * (n+1) as usize)
+            as *mut stbtt__edge; // add an extra one as a sentinel
+       if e == null_mut() { return };
+       n = 0;
+
+       m=0;
+       for i in 0..windings {
+          let p: *const stbtt__point = pts.offset(m);
+          m += *wcount.offset(i);
+          j = *wcount.offset(i)-1;
+          for k in 0..(*wcount.offset(i)) {
+              if k != 0 { j = k; }
+             let mut a: isize=k;
+             let mut b: isize =j;
+             // skip the edge if horizontal
+             if (*p.offset(j)).y == (*p.offset(k)).y {
+                continue;
+             }
+             // add edge from j to k to the list
+             (*e.offset(n)).invert = 0;
+             if if invert != 0 { (*p.offset(j)).y > (*p.offset(k)).y }
+                else { (*p.offset(j)).y < (*p.offset(k)).y } {
+                (*e.offset(n)).invert = 1;
+                a=j;
+                b=k;
+             }
+             (*e.offset(n)).x0 = (*p.offset(a)).x * scale_x + shift_x;
+             (*e.offset(n)).y0 = ((*p.offset(a)).y * y_scale_inv + shift_y) * vsubsample as f32;
+             (*e.offset(n)).x1 = (*p.offset(b)).x * scale_x + shift_x;
+             (*e.offset(n)).y1 = ((*p.offset(b)).y * y_scale_inv + shift_y) * vsubsample as f32;
+             n += 1;
+          }
+       }
+
+       // now sort the edges by their highest point (should snap to integer, and then by x)
+       //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
+       stbtt__sort_edges(e, n);
+
+       // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
+       stbtt__rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
+
+       STBTT_free!(e as *mut c_void);
+    }
+
    let scale: f32 = if scale_x > scale_y { scale_y } else { scale_x };
    let mut winding_count: isize = 0;
    let mut winding_lengths: *mut isize = null_mut();

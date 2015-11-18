@@ -241,11 +241,14 @@
 ////   The following sections allow you to supply alternate definitions
 ////   of C library functions used by stb_truetype.
 
+extern crate byteorder;
 extern crate libc;
 
 use std::ptr::{ null, null_mut };
 use std::mem::size_of;
 use std::ffi::CString;
+use std::slice;
+use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
 
 pub type stbtt_uint8 = u8;
@@ -634,45 +637,27 @@ macro_rules! ttCHAR {
 
 macro_rules! ttUSHORT {
     ($p:expr) => {
-        *($p as *const stbtt_uint16)
+        BigEndian::read_u16(slice::from_raw_parts($p, 2))
     }
 }
 
 macro_rules! ttSHORT {
     ($p:expr) => {
-        *($p as *const stbtt_int16)
+        BigEndian::read_i16(slice::from_raw_parts($p, 2))
     }
 }
 
 macro_rules! ttULONG {
     ($p:expr) => {
-        *($p as *const stbtt_uint32)
+        BigEndian::read_u32(slice::from_raw_parts($p, 4))
     }
 }
 
 macro_rules! ttLONG {
     ($p:expr) => {
-        *($p as *const stbtt_int32)
+        BigEndian::read_i32(slice::from_raw_parts($p, 4))
     }
 }
-
-/* TODO: Endian conversion.
-#if defined(STB_TRUETYPE_BIGENDIAN) && !defined(ALLOW_UNALIGNED_TRUETYPE)
-
-   #define ttUSHORT(p)   (* (stbtt_uint16 *) (p))
-   #define ttSHORT(p)    (* (stbtt_int16 *) (p))
-   #define ttULONG(p)    (* (stbtt_uint32 *) (p))
-   #define ttLONG(p)     (* (stbtt_int32 *) (p))
-
-#else
-
-   static stbtt_uint16 ttUSHORT(const stbtt_uint8 *p) { return p[0]*256 + p[1]; }
-   static stbtt_int16 ttSHORT(const stbtt_uint8 *p)   { return p[0]*256 + p[1]; }
-   static stbtt_uint32 ttULONG(const stbtt_uint8 *p)  { return (p[0]<<24) + (p[1]<<16) + (p[2]<<8) + p[3]; }
-   static stbtt_int32 ttLONG(const stbtt_uint8 *p)    { return (p[0]<<24) + (p[1]<<16) + (p[2]<<8) + p[3]; }
-
-#endif
-*/
 
 macro_rules! stbtt_tag4 {
     ($p:expr, $c0:expr, $c1:expr, $c2:expr, $c3:expr) => {

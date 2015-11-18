@@ -2547,9 +2547,7 @@ pub unsafe fn rasterize(
        let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
        let e: *mut stbtt__edge;
        let mut n: isize;
-       let i: isize;
        let mut j: isize;
-       let k: isize;
        let mut m: isize;
     // TODO: Conditional compilation.
     // #if STBTT_RASTERIZER_VERSION == 1

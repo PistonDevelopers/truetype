@@ -442,6 +442,32 @@ pub struct stbtt_fontinfo {
    indexToLocFormat: isize,
 }
 
+impl stbtt_fontinfo {
+    pub fn uninitialized() -> stbtt_fontinfo {
+        stbtt_fontinfo{
+            userdata: null(),
+           // pointer to .ttf file
+           data: null_mut(),
+           // offset of start of font
+           fontstart: 0,
+           // number of glyphs, needed for range checking
+           numGlyphs: 0,
+
+           // table locations as offset from start of .ttf
+           loca: 0,
+           head: 0,
+           glyf: 0,
+           hhea: 0,
+           hmtx: 0,
+           kern: 0,
+           // a cmap mapping for our chosen character encoding
+           index_map: 0,
+           // format needed to map from glyph index to glyph
+           indexToLocFormat: 0,
+        }
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // CHARACTER TO GLYPH-INDEX CONVERSIOn

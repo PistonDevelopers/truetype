@@ -1533,7 +1533,7 @@ pub unsafe fn stbtt_ScaleForMappingEmToPixels(
 //
 // BITMAP RENDERING
 //
-pub unsafe fn stbtt_FreeShape(info: *const stbtt_fontinfo, v: *mut stbtt_vertex)
+pub unsafe fn free_shape(_info: *const stbtt_fontinfo, v: *mut stbtt_vertex)
 {
    STBTT_free!(v as *mut c_void);
 }
@@ -1543,7 +1543,7 @@ pub unsafe fn stbtt_FreeShape(info: *const stbtt_fontinfo, v: *mut stbtt_vertex)
 // antialiasing software rasterizer
 //
 
-pub unsafe fn stbtt_GetGlyphBitmapBoxSubpixel(
+pub unsafe fn get_glyph_bitmap_box_subpixel(
     font: *const stbtt_fontinfo,
     glyph: isize,
     scale_x: f32,
@@ -1574,7 +1574,7 @@ pub unsafe fn stbtt_GetGlyphBitmapBoxSubpixel(
    }
 }
 
-pub unsafe fn stbtt_GetGlyphBitmapBox(
+pub unsafe fn get_glyph_bitmap_box(
     font: *const stbtt_fontinfo,
     glyph: isize,
     scale_x: f32,
@@ -1584,12 +1584,12 @@ pub unsafe fn stbtt_GetGlyphBitmapBox(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   stbtt_GetGlyphBitmapBoxSubpixel(font, glyph, scale_x, scale_y,0.0,0.0, ix0, iy0, ix1, iy1);
+   get_glyph_bitmap_box_subpixel(font, glyph, scale_x, scale_y,0.0,0.0, ix0, iy0, ix1, iy1);
 }
 
 // same as stbtt_GetCodepointBitmapBox, but you can specify a subpixel
 // shift for the character
-pub unsafe fn stbtt_GetCodepointBitmapBoxSubpixel(
+pub unsafe fn get_codepoint_bitmap_box_subpixel(
     font: *const stbtt_fontinfo,
     codepoint: isize,
     scale_x: f32,
@@ -1601,7 +1601,7 @@ pub unsafe fn stbtt_GetCodepointBitmapBoxSubpixel(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   stbtt_GetGlyphBitmapBoxSubpixel(font, stbtt_FindGlyphIndex(font,codepoint), scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
+   get_glyph_bitmap_box_subpixel(font, stbtt_FindGlyphIndex(font,codepoint), scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
 }
 
 // get the bbox of the bitmap centered around the glyph origin; so the
@@ -1609,7 +1609,7 @@ pub unsafe fn stbtt_GetCodepointBitmapBoxSubpixel(
 // the bitmap top left is (leftSideBearing*scale,iy0).
 // (Note that the bitmap uses y-increases-down, but the shape uses
 // y-increases-up, so CodepointBitmapBox and CodepointBox are inverted.)
-pub unsafe fn stbtt_GetCodepointBitmapBox(
+pub unsafe fn get_codepoint_bitmap_box(
     font: *const stbtt_fontinfo,
     codepoint: isize,
     scale_x: f32,
@@ -1619,7 +1619,7 @@ pub unsafe fn stbtt_GetCodepointBitmapBox(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   stbtt_GetCodepointBitmapBoxSubpixel(font, codepoint, scale_x, scale_y,0.0,0.0, ix0,iy0,ix1,iy1);
+   get_codepoint_bitmap_box_subpixel(font, codepoint, scale_x, scale_y,0.0,0.0, ix0,iy0,ix1,iy1);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2648,7 +2648,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
       scale_y = scale_x;
    }
 
-   stbtt_GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y,
+   get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
        shift_x, shift_y, &mut ix0,&mut iy0,&mut ix1,&mut iy1);
 
    // now we get the size
@@ -2713,7 +2713,7 @@ pub unsafe fn make_glyph_bitmap_subpixel(
    let mut vertices: *mut stbtt_vertex = null_mut();
    let num_verts: isize = stbtt_GetGlyphShape(info, glyph, &mut vertices);
 
-   stbtt_GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y,
+   get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
        shift_x, shift_y, &mut ix0,&mut iy0,null_mut(),null_mut());
    let mut gbm: stbtt__bitmap = stbtt__bitmap
    {
@@ -2876,7 +2876,7 @@ pub unsafe fn bake_font_bitmap(
       let gh: isize;
       let g: isize = stbtt_FindGlyphIndex(&f, first_char + i);
       stbtt_GetGlyphHMetrics(&f, g, &mut advance, &mut lsb);
-      stbtt_GetGlyphBitmapBox(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
+      get_glyph_bitmap_box(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
       gw = x1-x0;
       gh = y1-y0;
       if x + gw + 1 >= pw {
@@ -3324,7 +3324,7 @@ pub unsafe fn pack_font_ranges_gather_rects(
                 *(*ranges.offset(i)).array_of_unicode_codepoints.offset(j)
              };
          let glyph: isize = stbtt_FindGlyphIndex(info, codepoint);
-         stbtt_GetGlyphBitmapBoxSubpixel(info,glyph,
+         get_glyph_bitmap_box_subpixel(info,glyph,
                                          scale * (*spc).h_oversample as f32,
                                          scale * (*spc).v_oversample as f32,
                                          0.0,0.0,
@@ -3394,7 +3394,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
             (*r).w -= pad;
             (*r).h -= pad;
             stbtt_GetGlyphHMetrics(info, glyph, &mut advance, &mut lsb);
-            stbtt_GetGlyphBitmapBox(info, glyph,
+            get_glyph_bitmap_box(info, glyph,
                                     scale * (*spc).h_oversample as f32,
                                     scale * (*spc).v_oversample as f32,
                                     &mut x0,&mut y0,&mut x1,&mut y1);

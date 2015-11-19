@@ -1993,8 +1993,8 @@ pub unsafe fn fill_active_edges_new(
          }
       } else {
          let mut x0: f32 = (*e).fx;
-         let mut dx: f32 = (*e).fdx;
-         let mut xb: f32 = x0 + dx;
+         let dx: f32 = (*e).fdx;
+         let xb: f32 = x0 + dx;
          let mut x_top: f32;
          let mut x_bottom: f32;
          let mut sy0: f32;
@@ -2054,11 +2054,8 @@ pub unsafe fn fill_active_edges_new(
                   t = x_bottom;
                   x_bottom = x_top;
                   x_top = t;
-                  dx = -dx;
                   dy = -dy;
-                  t = x0;
                   x0 = xb;
-                  xb = t;
                }
 
                x1 = x_top as isize;

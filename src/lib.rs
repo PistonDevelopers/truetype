@@ -539,11 +539,11 @@ pub struct stbtt__bitmap
 //             from the file yourself and do your own comparisons on them.
 //             You have to have called stbtt_InitFont() first.
 
-const STBTT_MACSTYLE_DONTCARE: u8 = 0;
-const STBTT_MACSTYLE_BOLD: u8 = 1;
-const STBTT_MACSTYLE_ITALIC: u8 = 2;
-const STBTT_MACSTYLE_UNDERSCORE: u8 = 4;
-const STBTT_MACSTYLE_NONE: u8 = 8;   // <= not same as 0, this makes us check the bitfield is 0
+// const STBTT_MACSTYLE_DONTCARE: u8 = 0;
+// const STBTT_MACSTYLE_BOLD: u8 = 1;
+// const STBTT_MACSTYLE_ITALIC: u8 = 2;
+// const STBTT_MACSTYLE_UNDERSCORE: u8 = 4;
+// const STBTT_MACSTYLE_NONE: u8 = 8;   // <= not same as 0, this makes us check the bitfield is 0
 
 enum PlatformId { // platform_id
    Unicode   =0,

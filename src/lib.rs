@@ -498,17 +498,6 @@ pub enum STBTT_cmd {
   vcurve=3
 }
 
-impl From<u8> for STBTT_cmd {
-    fn from(val: u8) -> STBTT_cmd {
-        match val {
-            1 => STBTT_cmd::vmove,
-            2 => STBTT_cmd::vline,
-            3 => STBTT_cmd::vcurve,
-            _ => panic!("Unknown STBTT_cmd")
-        }
-    }
-}
-
 type stbtt_vertex_type = i16;
 #[derive(Copy, Clone)]
 pub struct stbtt_vertex {
@@ -517,7 +506,7 @@ pub struct stbtt_vertex {
    cx: i16,
    cy: i16,
    type_: STBTT_cmd,
-   padding: u8,
+   flags: u8,
 }
 
 // @TODO: don't expose this structure
@@ -1180,20 +1169,19 @@ pub unsafe fn stbtt_GetGlyphShape(
          } else {
             flagcount -= 1;
          }
-         (*vertices.offset(off as isize +i as isize)).type_ = flags.into();
+         (*vertices.offset(off as isize +i as isize)).flags = flags;
       }
-
       // now load x coordinates
       x=0;
       for i in 0..n {
-         flags = (*vertices.offset(off as isize +i as isize)).type_ as u8;
+         flags = (*vertices.offset(off as isize + i as isize)).flags;
          if (flags & 2) != 0 {
             let dx: stbtt_int16 = *points as i16;
             points = points.offset(1);
             x += if (flags & 16) != 0 { dx as i32 } else { -dx as i32 }; // ???
          } else {
             if (flags & 16) == 0 {
-               x = x + (*points*256 + *points.offset(1)) as i32;
+               x = x + BigEndian::read_i16(slice::from_raw_parts(points, 2)) as i32;
                points = points.offset(2);
             }
          }
@@ -1203,14 +1191,14 @@ pub unsafe fn stbtt_GetGlyphShape(
       // now load y coordinates
       y=0;
       for i in 0..n {
-         flags = (*vertices.offset(off as isize +i as isize)).type_ as u8;
+         flags = (*vertices.offset(off as isize + i as isize)).flags;
          if (flags & 4) != 0 {
             let dy: stbtt_int16 = *points as i16;
             points = points.offset(1);
             y += if (flags & 32) != 0 { dy as i32 } else { -dy as i32 }; // ???
          } else {
             if (flags & 32) == 0 {
-               y = y + (*points.offset(0)*256 + *points.offset(1)) as i32;
+               y = y + BigEndian::read_i16(slice::from_raw_parts(points, 2)) as i32;
                points = points.offset(2);
             }
          }
@@ -1225,10 +1213,9 @@ pub unsafe fn stbtt_GetGlyphShape(
       let mut i_iter = (0..n).into_iter();
       let mut i = 0;
       while { if let Some(v) = i_iter.next() { i = v; true } else { false } } {
-         flags = (*vertices.offset(off as isize +i as isize)).type_ as u8;
+         flags = (*vertices.offset(off as isize +i as isize)).flags;
          x     = (*vertices.offset(off as isize +i as isize)).x as i32;
          y     = (*vertices.offset(off as isize +i as isize)).y as i32;
-
          if (next_move == i) {
             if (i != 0) {
                num_vertices = stbtt__close_shape(vertices,
@@ -1236,7 +1223,7 @@ pub unsafe fn stbtt_GetGlyphShape(
             }
 
             // now start the new one
-            start_off = !(flags & 1) as i32;
+            start_off = (1 - (flags & 1)) as i32;
             if start_off != 0 {
                // if we start off with an off-curve point, then when we need to find a point on the curve
                // where we can start, and we need to save some state for when we wraparound.

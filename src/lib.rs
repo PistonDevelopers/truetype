@@ -973,7 +973,7 @@ pub unsafe fn stbtt_GetCodepointShape(
     unicode_codepoint: isize,
      vertices: *mut *mut stbtt_vertex
 ) -> isize {
-   return stbtt_GetGlyphShape(info, stbtt_FindGlyphIndex(info, unicode_codepoint), vertices);
+   return get_glyph_shape(info, stbtt_FindGlyphIndex(info, unicode_codepoint), vertices);
 }
 
 pub unsafe fn stbtt_setvertex(
@@ -1096,13 +1096,13 @@ pub unsafe fn stbtt__close_shape(
 // draws a line from previous endpoint to its x,y; a curveto
 // draws a quadratic bezier from previous endpoint to
 // its x,y, using cx,cy as the bezier control point.
-pub unsafe fn stbtt_GetGlyphShape(
+pub unsafe fn get_glyph_shape(
     info: *const stbtt_fontinfo,
     glyph_index: isize,
     pvertices: *mut *mut stbtt_vertex
 ) -> isize {
-   let numberOfContours: stbtt_int16;
-   let endPtsOfContours: *mut stbtt_uint8;
+   let number_of_contours: stbtt_int16;
+   let end_pts_of_contours: *mut stbtt_uint8;
    let data: *mut stbtt_uint8 = (*info).data;
    let mut vertices: *mut stbtt_vertex=null_mut();
    let mut num_vertices: isize =0;
@@ -1112,9 +1112,9 @@ pub unsafe fn stbtt_GetGlyphShape(
 
    if g < 0 { return 0; }
 
-   numberOfContours = ttSHORT!(data.offset(g));
+   number_of_contours = ttSHORT!(data.offset(g));
 
-   if numberOfContours > 0 {
+   if number_of_contours > 0 {
       let mut flags: stbtt_uint8 =0;
       let mut flagcount: stbtt_uint8;
       let ins: stbtt_int32;
@@ -1135,13 +1135,13 @@ pub unsafe fn stbtt_GetGlyphShape(
       let mut scx: stbtt_int32;
       let mut scy: stbtt_int32;
       let mut points: *mut stbtt_uint8;
-      endPtsOfContours = data.offset(g + 10);
-      ins = ttUSHORT!(data.offset(g + 10 + numberOfContours as isize * 2)) as i32;
-      points = data.offset(g + 10 + numberOfContours as isize * 2 + 2 + ins as isize);
+      end_pts_of_contours = data.offset(g + 10);
+      ins = ttUSHORT!(data.offset(g + 10 + number_of_contours as isize * 2)) as i32;
+      points = data.offset(g + 10 + number_of_contours as isize * 2 + 2 + ins as isize);
 
-      n = 1+ttUSHORT!(endPtsOfContours.offset(numberOfContours as isize *2-2)) as i32;
+      n = 1+ttUSHORT!(end_pts_of_contours.offset(number_of_contours as isize *2-2)) as i32;
 
-      m = n + 2*numberOfContours as i32;  // a loose bound on how many vertices we might need
+      m = n + 2*number_of_contours as i32;  // a loose bound on how many vertices we might need
       vertices = STBTT_malloc!(m as usize * size_of::<stbtt_vertex>()) as *mut stbtt_vertex;
       if vertices == null_mut() {
          return 0;
@@ -1246,7 +1246,7 @@ pub unsafe fn stbtt_GetGlyphShape(
             stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vmove,sx,sy,0,0);
             num_vertices += 1;
             was_off = 0;
-            next_move = 1 + ttUSHORT!(endPtsOfContours.offset(j as isize *2)) as i32;
+            next_move = 1 + ttUSHORT!(end_pts_of_contours.offset(j as isize *2)) as i32;
             j += 1;
          } else {
             if (flags & 1) == 0 { // if it's a curve
@@ -1271,7 +1271,7 @@ pub unsafe fn stbtt_GetGlyphShape(
          }
       }
       num_vertices = stbtt__close_shape(vertices, num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
-   } else if (numberOfContours == -1) {
+   } else if (number_of_contours == -1) {
       // Compound shapes.
       let mut more: isize = 1;
       let mut comp: *const stbtt_uint8 = data.offset(g + 10);
@@ -1327,7 +1327,7 @@ pub unsafe fn stbtt_GetGlyphShape(
          n = STBTT_sqrt!(mtx[2]*mtx[2] + mtx[3]*mtx[3]) as f32;
 
          // Get indexed glyph.
-         comp_num_verts = stbtt_GetGlyphShape(info, gidx as isize, &mut comp_verts);
+         comp_num_verts = get_glyph_shape(info, gidx as isize, &mut comp_verts);
          if (comp_num_verts > 0) {
             // Transform vertices.
             for i in 0..comp_num_verts {
@@ -1363,7 +1363,7 @@ pub unsafe fn stbtt_GetGlyphShape(
          // More components ?
          more = (flags & (1<<5)) as isize;
       }
-   } else if (numberOfContours < 0) {
+   } else if (number_of_contours < 0) {
       // @TODO other compound variations?
       STBTT_assert!(false);
    } else {
@@ -1374,32 +1374,32 @@ pub unsafe fn stbtt_GetGlyphShape(
    return num_vertices;
 }
 
-pub unsafe fn stbtt_GetGlyphHMetrics(
+pub unsafe fn get_glyph_hmetrics(
     info: *const stbtt_fontinfo,
     glyph_index: isize,
-    advanceWidth: *mut isize,
-    leftSideBearing: *mut isize
+    advance_width: *mut isize,
+    left_side_bearing: *mut isize
 ) {
-   let numOfLongHorMetrics: stbtt_uint16 = ttUSHORT!((*info).data.offset((*info).hhea + 34));
-   if (glyph_index < numOfLongHorMetrics as isize) {
-      if advanceWidth != null_mut() {
-          *advanceWidth    = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index)) as isize;
+   let num_of_long_hor_metrics: stbtt_uint16 = ttUSHORT!((*info).data.offset((*info).hhea + 34));
+   if (glyph_index < num_of_long_hor_metrics as isize) {
+      if advance_width != null_mut() {
+          *advance_width    = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index)) as isize;
       }
-      if leftSideBearing != null_mut() {
-          *leftSideBearing = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index + 2)) as isize;
+      if left_side_bearing != null_mut() {
+          *left_side_bearing = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index + 2)) as isize;
       }
    } else {
-      if advanceWidth != null_mut() {
-          *advanceWidth    = ttSHORT!((*info).data.offset((*info).hmtx + 4*(numOfLongHorMetrics as isize -1))) as isize;
+      if advance_width != null_mut() {
+          *advance_width    = ttSHORT!((*info).data.offset((*info).hmtx + 4*(num_of_long_hor_metrics as isize -1))) as isize;
       }
-      if leftSideBearing != null_mut() {
-          *leftSideBearing = ttSHORT!((*info).data.offset(
-              (*info).hmtx + 4*numOfLongHorMetrics as isize + 2*(glyph_index - numOfLongHorMetrics as isize))) as isize;
+      if left_side_bearing != null_mut() {
+          *left_side_bearing = ttSHORT!((*info).data.offset(
+              (*info).hmtx + 4*num_of_long_hor_metrics as isize + 2*(glyph_index - num_of_long_hor_metrics as isize))) as isize;
       }
    }
 }
 
-pub unsafe fn stbtt_GetGlyphKernAdvance(
+pub unsafe fn get_glyph_kern_advance(
     info: *mut stbtt_fontinfo,
     glyph1: isize,
     glyph2: isize
@@ -1441,7 +1441,7 @@ pub unsafe fn stbtt_GetGlyphKernAdvance(
 }
 
 // an additional amount to add to the 'advance' value between ch1 and ch2
-pub unsafe fn stbtt_GetCodepointKernAdvance(
+pub unsafe fn get_codepoint_kern_advance(
     info: *mut stbtt_fontinfo,
     ch1: isize,
     ch2: isize
@@ -1449,19 +1449,19 @@ pub unsafe fn stbtt_GetCodepointKernAdvance(
    if (*info).kern == 0 { // if no kerning table, don't waste time looking up both codepoint->glyphs
       return 0;
    }
-   return stbtt_GetGlyphKernAdvance(info, stbtt_FindGlyphIndex(info,ch1), stbtt_FindGlyphIndex(info,ch2));
+   return get_glyph_kern_advance(info, stbtt_FindGlyphIndex(info,ch1), stbtt_FindGlyphIndex(info,ch2));
 }
 
 // leftSideBearing is the offset from the current horizontal position to the left edge of the character
 // advanceWidth is the offset from the current horizontal position to the next horizontal position
 //   these are expressed in unscaled coordinates
-pub unsafe fn stbtt_GetCodepointHMetrics(
+pub unsafe fn get_codepoint_hmetrics(
     info: *const stbtt_fontinfo,
     codepoint: isize,
-    advanceWidth: *mut isize,
-    leftSideBearing: *mut isize
+    advance_width: *mut isize,
+    left_side_bearing: *mut isize
 ) {
-   stbtt_GetGlyphHMetrics(info, stbtt_FindGlyphIndex(info,codepoint), advanceWidth, leftSideBearing);
+   get_glyph_hmetrics(info, stbtt_FindGlyphIndex(info,codepoint), advance_width, left_side_bearing);
 }
 
 // ascent is the coordinate above the baseline the font extends; descent
@@ -1470,11 +1470,11 @@ pub unsafe fn stbtt_GetCodepointHMetrics(
 // so you should advance the vertical position by "*ascent - *descent + *lineGap"
 //   these are expressed in unscaled coordinates, so you must multiply by
 //   the scale factor for a given size
-pub unsafe fn stbtt_GetFontVMetrics(
+pub unsafe fn get_font_vmetrics(
     info: *const stbtt_fontinfo,
     ascent: *mut isize,
     descent: *mut isize,
-    lineGap: *mut isize
+    line_gap: *mut isize
 ) {
    if ascent != null_mut() {
        *ascent  = ttSHORT!((*info).data.offset((*info).hhea + 4)) as isize;
@@ -1482,13 +1482,13 @@ pub unsafe fn stbtt_GetFontVMetrics(
    if descent != null_mut() {
        *descent = ttSHORT!((*info).data.offset((*info).hhea + 6)) as isize;
    }
-   if lineGap != null_mut() {
-       *lineGap = ttSHORT!((*info).data.offset((*info).hhea + 8)) as isize;
+   if line_gap != null_mut() {
+       *line_gap = ttSHORT!((*info).data.offset((*info).hhea + 8)) as isize;
    }
 }
 
 // the bounding box around all possible characters
-pub unsafe fn stbtt_GetFontBoundingBox(
+pub unsafe fn get_font_bounding_box(
     info: *const stbtt_fontinfo,
     x0: *mut isize,
     y0: *mut isize,
@@ -1507,7 +1507,7 @@ pub unsafe fn stbtt_GetFontBoundingBox(
 // and computing:
 //       scale = pixels / (ascent - descent)
 // so if you prefer to measure height by the ascent only, use a similar calculation.
-pub unsafe fn stbtt_ScaleForPixelHeight(
+pub unsafe fn scale_for_pixel_height(
     info: *const stbtt_fontinfo,
     height: f32
 ) -> f32 {
@@ -1519,12 +1519,12 @@ pub unsafe fn stbtt_ScaleForPixelHeight(
 // computes a scale factor to produce a font whose EM size is mapped to
 // 'pixels' tall. This is probably what traditional APIs compute, but
 // I'm not positive.
-pub unsafe fn stbtt_ScaleForMappingEmToPixels(
+pub unsafe fn scale_for_mapping_em_to_pixels(
     info: *const stbtt_fontinfo,
     pixels: f32
 ) -> f32 {
-   let unitsPerEm = ttUSHORT!((*info).data.offset((*info).head + 18));
-   return pixels / unitsPerEm as f32;
+   let units_per_em = ttUSHORT!((*info).data.offset((*info).head + 18));
+   return pixels / units_per_em as f32;
 }
 
 // frees the data allocated above
@@ -2640,7 +2640,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
    let mut ix1: isize = 0;
    let mut iy1: isize = 0;
    let mut vertices: *mut stbtt_vertex = null_mut();
-   let num_verts: isize = stbtt_GetGlyphShape(info, glyph, &mut vertices);
+   let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
    if scale_x == 0.0 { scale_x = scale_y; }
    if scale_y == 0.0 {
@@ -2711,7 +2711,7 @@ pub unsafe fn make_glyph_bitmap_subpixel(
    let mut ix0: isize = 0;
    let mut iy0: isize = 0;
    let mut vertices: *mut stbtt_vertex = null_mut();
-   let num_verts: isize = stbtt_GetGlyphShape(info, glyph, &mut vertices);
+   let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
    get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
        shift_x, shift_y, &mut ix0,&mut iy0,null_mut(),null_mut());
@@ -2863,7 +2863,7 @@ pub unsafe fn bake_font_bitmap(
    y=1;
    bottom_y = 1;
 
-   scale = stbtt_ScaleForPixelHeight(&f, pixel_height);
+   scale = scale_for_pixel_height(&f, pixel_height);
 
    for i in 0..num_chars {
       let mut advance: isize = 0;
@@ -2875,7 +2875,7 @@ pub unsafe fn bake_font_bitmap(
       let gw: isize;
       let gh: isize;
       let g: isize = stbtt_FindGlyphIndex(&f, first_char + i);
-      stbtt_GetGlyphHMetrics(&f, g, &mut advance, &mut lsb);
+      get_glyph_hmetrics(&f, g, &mut advance, &mut lsb);
       get_glyph_bitmap_box(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
       gw = x1-x0;
       gh = y1-y0;
@@ -3309,8 +3309,8 @@ pub unsafe fn pack_font_ranges_gather_rects(
    k=0;
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
-      let scale: f32 = if fh > 0.0 { stbtt_ScaleForPixelHeight(info, fh) }
-        else { stbtt_ScaleForMappingEmToPixels(info, -fh) };
+      let scale: f32 = if fh > 0.0 { scale_for_pixel_height(info, fh) }
+        else { scale_for_mapping_em_to_pixels(info, -fh) };
       (*ranges.offset(i)).h_oversample = (*spc).h_oversample as u8;
       (*ranges.offset(i)).v_oversample = (*spc).v_oversample as u8;
       for j in 0..(*ranges.offset(i)).num_chars {
@@ -3357,8 +3357,8 @@ pub unsafe fn pack_font_ranges_render_into_rects(
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
       let scale: f32 = if fh > 0.0 {
-            stbtt_ScaleForPixelHeight(info, fh)
-          } else { stbtt_ScaleForMappingEmToPixels(info, -fh) };
+            scale_for_pixel_height(info, fh)
+          } else { scale_for_mapping_em_to_pixels(info, -fh) };
       let recip_h: f32;
       let recip_v: f32;
       let sub_x: f32;
@@ -3393,7 +3393,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
             (*r).y += pad;
             (*r).w -= pad;
             (*r).h -= pad;
-            stbtt_GetGlyphHMetrics(info, glyph, &mut advance, &mut lsb);
+            get_glyph_hmetrics(info, glyph, &mut advance, &mut lsb);
             get_glyph_bitmap_box(info, glyph,
                                     scale * (*spc).h_oversample as f32,
                                     scale * (*spc).v_oversample as f32,

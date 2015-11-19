@@ -16,7 +16,7 @@ fn draw_capital_a() {
 
         let offset = stbtt_GetFontOffsetForIndex(ttf_buffer.as_ptr(),0) as isize;
         stbtt_InitFont(&mut font, ttf_buffer[..].as_mut_ptr(), offset);
-        let scale = stbtt_ScaleForPixelHeight(&font, s);
+        let scale = scale_for_pixel_height(&font, s);
         let bitmap = get_codepoint_bitmap(&font, 0.0,scale, c as isize, &mut w, &mut h, null_mut(),null_mut());
 
         let mut result = String::new();

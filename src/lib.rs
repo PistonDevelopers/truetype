@@ -1740,7 +1740,7 @@ static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, i
 }
 */
 // #elif STBTT_RASTERIZER_VERSION == 2
-pub unsafe fn stbtt__new_active(
+pub unsafe fn new_active(
     hh: *mut stbtt__hheap,
     e: *mut stbtt__edge,
     off_x: isize,
@@ -1917,7 +1917,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
 
 // the edge passed in here does not cross the vertical line at x or the vertical line at x+1
 // (i.e. it has already been clipped to those)
-pub unsafe fn stbtt__handle_clipped_edge(
+pub unsafe fn handle_clipped_edge(
     scanline: *mut f32,
     x: isize,
     e: *mut stbtt__active_edge,
@@ -1985,10 +1985,10 @@ pub unsafe fn fill_active_edges_new(
          let x0: f32 = (*e).fx;
          if x0 < len as f32 {
             if x0 >= 0.0 {
-               stbtt__handle_clipped_edge(scanline,x0 as isize,e, x0,y_top, x0,y_bottom);
-               stbtt__handle_clipped_edge(scanline_fill.offset(-1),x0 as isize +1,e, x0,y_top, x0,y_bottom);
+               handle_clipped_edge(scanline,x0 as isize,e, x0,y_top, x0,y_bottom);
+               handle_clipped_edge(scanline_fill.offset(-1),x0 as isize +1,e, x0,y_top, x0,y_bottom);
             } else {
-               stbtt__handle_clipped_edge(scanline_fill.offset(-1),0,e, x0,y_top, x0,y_bottom);
+               handle_clipped_edge(scanline_fill.offset(-1),0,e, x0,y_top, x0,y_bottom);
             }
          }
       } else {
@@ -2035,7 +2035,6 @@ pub unsafe fn fill_active_edges_new(
                *scanline.offset(x) += (*e).direction * (1.0-((x_top - x as f32) + (x_bottom-x as f32))/2.0)  * height;
                *scanline_fill.offset(x) += (*e).direction * height; // everything right of this pixel is filled
             } else {
-               let x: isize;
                let x1: isize;
                let x2: isize;
                let mut y_crossing: f32;
@@ -2118,27 +2117,27 @@ pub unsafe fn fill_active_edges_new(
                y2 = (x as f32+1.0 - x0) / dx + y_top;
 
                if x0 < x1 && x3 > x2 {         // three segments descending down-right
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
                } else if x3 < x1 && x0 > x2 {  // three segments descending down-left
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
                } else if x0 < x1 && x3 > x1 {  // two segments across x, down-right
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
                } else if x3 < x1 && x0 > x1 {  // two segments across x, down-left
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
                } else if x0 < x2 && x3 > x2 {  // two segments across x+1, down-right
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
                } else if x3 < x2 && x0 > x2 {  // two segments across x+1, down-left
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
                } else {  // one segment
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x3,y3);
                }
             }
          }
@@ -2208,7 +2207,7 @@ pub unsafe fn rasterize_sorted_edges(
       // insert all edges that start before the bottom of this scanline
       while ((*e).y0 <= scan_y_bottom) {
          if ((*e).y0 != (*e).y1) {
-            let z: *mut stbtt__active_edge = stbtt__new_active(
+            let z: *mut stbtt__active_edge = new_active(
                 &mut hh, e, off_x, scan_y_top, userdata);
             STBTT_assert!((*z).ey >= scan_y_top);
             // insert at front

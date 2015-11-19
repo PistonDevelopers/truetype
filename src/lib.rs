@@ -2365,14 +2365,14 @@ pub unsafe fn stbtt__sort_edges(p: *mut stbtt__edge, n: isize) {
    stbtt__sort_edges_ins_sort(p, n);
 }
 
-pub struct stbtt__point
+pub struct Point
 {
    x: f32,
    y: f32,
 }
 
 pub unsafe fn add_point(
-    points: *mut stbtt__point,
+    points: *mut Point,
     n: isize,
     x: f32,
     y: f32
@@ -2384,7 +2384,7 @@ pub unsafe fn add_point(
 
 // tesselate until threshhold p is happy... @TODO warped to compensate for non-linear stretching
 pub unsafe fn tesselate_curve(
-    points: *mut stbtt__point,
+    points: *mut Point,
     num_points: *mut isize,
     x0: f32,
     y0: f32,
@@ -2422,8 +2422,8 @@ pub unsafe fn flatten_curves(
     contour_lengths: *mut *mut isize,
     num_contours: *mut isize,
     _userdata: *const ()
-) -> *mut stbtt__point {
-    let mut points: *mut stbtt__point = null_mut();
+) -> *mut Point {
+    let mut points: *mut Point = null_mut();
     let mut num_points: isize =0;
 
    let objspace_flatness_squared: f32 = objspace_flatness * objspace_flatness;
@@ -2453,8 +2453,8 @@ pub unsafe fn flatten_curves(
       let mut x: f32=0.0;
       let mut y: f32=0.0;
       if (pass == 1) {
-         points = STBTT_malloc!(num_points as usize * size_of::<stbtt__point>())
-            as *mut stbtt__point;
+         points = STBTT_malloc!(num_points as usize * size_of::<Point>())
+            as *mut Point;
          if points == null_mut() {
              break 'error;
          };
@@ -2532,7 +2532,7 @@ pub unsafe fn rasterize(
     #[allow(non_snake_case)]
     unsafe fn stbtt__rasterize(
         result: *mut stbtt__bitmap,
-        pts: *mut stbtt__point,
+        pts: *mut Point,
         wcount: *mut isize,
         windings: isize,
         scale_x: f32,
@@ -2572,7 +2572,7 @@ pub unsafe fn rasterize(
 
        m=0;
        for i in 0..windings {
-          let p: *const stbtt__point = pts.offset(m);
+          let p: *const Point = pts.offset(m);
           m += *wcount.offset(i);
           j = *wcount.offset(i)-1;
           for k in 0..(*wcount.offset(i)) {
@@ -2612,7 +2612,7 @@ pub unsafe fn rasterize(
    let scale: f32 = if scale_x > scale_y { scale_y } else { scale_x };
    let mut winding_count: isize = 0;
    let mut winding_lengths: *mut isize = null_mut();
-   let windings: *mut stbtt__point = flatten_curves(vertices, num_verts,
+   let windings: *mut Point = flatten_curves(vertices, num_verts,
        flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count, userdata);
    if windings != null_mut() {
       stbtt__rasterize(result, windings, winding_lengths, winding_count,

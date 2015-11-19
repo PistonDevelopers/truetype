@@ -698,7 +698,7 @@ macro_rules! stbtt_tag {
 
 // #define stbtt_tag(p,str)           stbtt_tag4(p,str[0],str[1],str[2],str[3])
 
-pub unsafe fn stbtt__isfont(font: *const stbtt_uint8) -> isize {
+pub unsafe fn isfont(font: *const stbtt_uint8) -> isize {
    // check the version number
    if (stbtt_tag4!(font, '1' as u8,0,0,0)) { return 1; } // TrueType 1
    if (stbtt_tag!(font, "typ1".as_ptr()))  { return 1; } // TrueType with type 1 font -- we don't support this!
@@ -708,14 +708,13 @@ pub unsafe fn stbtt__isfont(font: *const stbtt_uint8) -> isize {
 }
 
 // @OPTIMIZE: binary search
-pub unsafe fn stbtt__find_table(
+pub unsafe fn find_table(
     data: *const stbtt_uint8,
     fontstart: stbtt_uint32,
     tag: *const c_char
 ) -> stbtt_uint32 {
    let num_tables: stbtt_int32 = ttUSHORT!(data.offset(fontstart as isize +4)) as i32;
    let tabledir: stbtt_uint32 = fontstart + 12;
-   let i: stbtt_int32;
    for i in 0..num_tables {
       let loc: stbtt_uint32 = tabledir + 16*i as u32;
       if (stbtt_tag!(data.offset(loc as isize +0), tag as *const u8)) {
@@ -731,12 +730,12 @@ pub unsafe fn stbtt__find_table(
 // file will only define one font and it always be at offset 0, so it will
 // return '0' for index 0, and -1 for all other indices. You can just skip
 // this step if you know it's that kind of font.
-pub unsafe fn stbtt_GetFontOffsetForIndex(
+pub unsafe fn get_font_offset_for_index(
     font_collection: *const u8,
     index: isize
 ) -> stbtt_int32 {
    // if it's just a font, there's only one valid index
-   if stbtt__isfont(font_collection) != 0 {
+   if isfont(font_collection) != 0 {
       return if index == 0 { 0 } else { -1 };
    }
 
@@ -760,7 +759,7 @@ pub unsafe fn stbtt_GetFontOffsetForIndex(
 // the stbtt_fontinfo yourself, and stbtt_InitFont will fill it out. You don't
 // need to do anything special to free it, because the contents are pure
 // value data with no additional data structures. Returns 0 on failure.
-pub unsafe fn stbtt_InitFont(
+pub unsafe fn init_font(
     info: *mut stbtt_fontinfo,
     data2: *mut u8,
     fontstart: isize
@@ -768,25 +767,24 @@ pub unsafe fn stbtt_InitFont(
    let data: *mut stbtt_uint8 = data2;
    let cmap: stbtt_uint32;
    let t: stbtt_uint32;
-   let i: stbtt_int32;
-   let numTables: stbtt_int32;
+   let num_tables: stbtt_int32;
 
    (*info).data = data;
    (*info).fontstart = fontstart;
 
-   cmap = stbtt__find_table(data, fontstart as u32,
+   cmap = find_table(data, fontstart as u32,
        "cmap".as_ptr() as *const c_char) as u32;       // required
-   (*info).loca = stbtt__find_table(data, fontstart as u32,
+   (*info).loca = find_table(data, fontstart as u32,
        "loca".as_ptr() as *const c_char) as isize; // required
-   (*info).head = stbtt__find_table(data, fontstart as u32,
+   (*info).head = find_table(data, fontstart as u32,
        "head".as_ptr() as *const c_char) as isize; // required
-   (*info).glyf = stbtt__find_table(data, fontstart as u32,
+   (*info).glyf = find_table(data, fontstart as u32,
        "glyf".as_ptr() as *const c_char) as isize; // required
-   (*info).hhea = stbtt__find_table(data, fontstart as u32,
+   (*info).hhea = find_table(data, fontstart as u32,
        "hhea".as_ptr() as *const c_char) as isize; // required
-   (*info).hmtx = stbtt__find_table(data, fontstart as u32,
+   (*info).hmtx = find_table(data, fontstart as u32,
        "hmtx".as_ptr() as *const c_char) as isize; // required
-   (*info).kern = stbtt__find_table(data, fontstart as u32,
+   (*info).kern = find_table(data, fontstart as u32,
        "kern".as_ptr() as *const c_char) as isize; // not required
    if (cmap == 0
     || (*info).loca == 0
@@ -797,7 +795,7 @@ pub unsafe fn stbtt_InitFont(
       return 0;
    }
 
-   t = stbtt__find_table(data, fontstart as u32,
+   t = find_table(data, fontstart as u32,
        "maxp".as_ptr() as *const c_char);
    if t != 0 {
       (*info).numGlyphs = ttUSHORT!(data.offset(t as isize +4)) as isize;
@@ -808,9 +806,9 @@ pub unsafe fn stbtt_InitFont(
    // find a cmap encoding table we understand *now* to avoid searching
    // later. (todo: could make this installable)
    // the same regardless of glyph.
-   numTables = ttUSHORT!(data.offset(cmap as isize + 2)) as i32;
+   num_tables = ttUSHORT!(data.offset(cmap as isize + 2)) as i32;
    (*info).index_map = 0;
-   for i in 0..numTables {
+   for i in 0..num_tables {
       let encoding_record: stbtt_uint32 = cmap + 4 + 8 * i as u32;
       // find an encoding we understand:
       let val: STBTT_PLATFORM_ID = ttUSHORT!(data.offset(encoding_record as isize)).into();
@@ -850,7 +848,7 @@ pub unsafe fn stbtt_InitFont(
 // and you want a speed-up, call this function with the character you're
 // going to process, then use glyph-based functions instead of the
 // codepoint-based functions.
-pub unsafe fn stbtt_FindGlyphIndex(
+pub unsafe fn find_glyph_index(
     info: *const stbtt_fontinfo,
     unicode_codepoint: isize
 ) -> isize {
@@ -878,13 +876,13 @@ pub unsafe fn stbtt_FindGlyphIndex(
       return 0;
    } else if (format == 4) { // standard mapping for windows fonts: binary search collection of ranges
       let segcount: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +6)) >> 1;
-      let mut searchRange: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
-      let mut entrySelector: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +10));
-      let rangeShift: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +12)) >> 1;
+      let mut search_range: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
+      let mut entry_selector: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +10));
+      let range_shift: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +12)) >> 1;
 
       // do a binary search of the segments
-      let endCount: stbtt_uint32 = index_map + 14;
-      let mut search: stbtt_uint32 = endCount;
+      let end_count: stbtt_uint32 = index_map + 14;
+      let mut search: stbtt_uint32 = end_count;
 
       if unicode_codepoint > 0xffff {
          return 0;
@@ -893,30 +891,30 @@ pub unsafe fn stbtt_FindGlyphIndex(
       // they lie from endCount .. endCount + segCount
       // but searchRange is the nearest power of two, so...
       if unicode_codepoint >= ttUSHORT!(data.offset(
-          search as isize + rangeShift as isize *2)) as isize {
-         search += rangeShift as u32 *2;
+          search as isize + range_shift as isize *2)) as isize {
+         search += range_shift as u32 *2;
       }
 
       // now decrement to bias correctly to find smallest
       search -= 2;
-      while entrySelector != 0 {
+      while entry_selector != 0 {
          let end: stbtt_uint16;
-         searchRange >>= 1;
-         end = ttUSHORT!(data.offset(search as isize + searchRange as isize *2));
+         search_range >>= 1;
+         end = ttUSHORT!(data.offset(search as isize + search_range as isize *2));
          if unicode_codepoint > end as isize {
-            search += searchRange as u32 *2;
+            search += search_range as u32 *2;
          }
-         entrySelector -= 1;
+         entry_selector -= 1;
       }
       search += 2;
 
       {
          let offset: stbtt_uint16;
          let start: stbtt_uint16;
-         let item: stbtt_uint16 = ((search - endCount) >> 1) as stbtt_uint16;
+         let item: stbtt_uint16 = ((search - end_count) >> 1) as stbtt_uint16;
 
          STBTT_assert!(unicode_codepoint <= ttUSHORT!(data.offset(
-             endCount as isize + 2*item as isize)) as isize);
+             end_count as isize + 2*item as isize)) as isize);
          start = ttUSHORT!(data.offset(index_map as isize + 14 +
              segcount as isize *2 + 2 + 2*item as isize));
          if unicode_codepoint < start as isize {
@@ -968,12 +966,12 @@ pub unsafe fn stbtt_FindGlyphIndex(
    return 0;
 }
 
-pub unsafe fn stbtt_GetCodepointShape(
+pub unsafe fn get_codepoint_shape(
     info: *const stbtt_fontinfo,
     unicode_codepoint: isize,
      vertices: *mut *mut stbtt_vertex
 ) -> isize {
-   return get_glyph_shape(info, stbtt_FindGlyphIndex(info, unicode_codepoint), vertices);
+   return get_glyph_shape(info, find_glyph_index(info, unicode_codepoint), vertices);
 }
 
 pub unsafe fn stbtt_setvertex(
@@ -991,7 +989,7 @@ pub unsafe fn stbtt_setvertex(
    (*v).cy = cy as stbtt_int16;
 }
 
-pub unsafe fn stbtt__GetGlyfOffset(
+pub unsafe fn get_glyph_offset(
     info: *const stbtt_fontinfo,
     glyph_index: isize
 ) -> isize {
@@ -1013,7 +1011,7 @@ pub unsafe fn stbtt__GetGlyfOffset(
 }
 
 // as above, but takes one or more glyph indices for greater efficiency
-pub unsafe fn stbtt_GetGlyphBox(
+pub unsafe fn get_glyph_box(
     info: *const stbtt_fontinfo,
     glyph_index: isize,
     x0: *mut isize,
@@ -1021,7 +1019,7 @@ pub unsafe fn stbtt_GetGlyphBox(
     x1: *mut isize,
     y1: *mut isize
 ) -> isize {
-   let g: isize = stbtt__GetGlyfOffset(info, glyph_index);
+   let g: isize = get_glyph_offset(info, glyph_index);
    if (g < 0) { return 0; }
 
    if x0 != null_mut() { *x0 = ttSHORT!((*info).data.offset(g + 2)) as isize; }
@@ -1032,7 +1030,7 @@ pub unsafe fn stbtt_GetGlyphBox(
 }
 
 // Gets the bounding box of the visible part of the glyph, in unscaled coordinates
-pub unsafe fn stbtt_GetCodepointBox(
+pub unsafe fn get_codepoint_box(
     info: *const stbtt_fontinfo,
     codepoint: isize,
     x0: *mut isize,
@@ -1040,22 +1038,22 @@ pub unsafe fn stbtt_GetCodepointBox(
     x1: *mut isize,
     y1: *mut isize
 ) -> isize {
-   return stbtt_GetGlyphBox(info, stbtt_FindGlyphIndex(info,codepoint), x0,y0,x1,y1);
+   return get_glyph_box(info, find_glyph_index(info,codepoint), x0,y0,x1,y1);
 }
 
 // returns non-zero if nothing is drawn for this glyph
-pub unsafe fn stbtt_IsGlyphEmpty(
+pub unsafe fn is_glyph_empty(
     info: *const stbtt_fontinfo,
     glyph_index: isize
 ) -> isize {
-   let numberOfContours: stbtt_int16;
-   let g: isize = stbtt__GetGlyfOffset(info, glyph_index);
+   let number_of_contours: stbtt_int16;
+   let g: isize = get_glyph_offset(info, glyph_index);
    if g < 0 { return 1; }
-   numberOfContours = ttSHORT!((*info).data.offset(g));
-   return if numberOfContours == 0 { 0 } else { 1 };
+   number_of_contours = ttSHORT!((*info).data.offset(g));
+   return if number_of_contours == 0 { 0 } else { 1 };
 }
 
-pub unsafe fn stbtt__close_shape(
+pub unsafe fn close_shape(
     vertices: *mut stbtt_vertex,
     mut num_vertices: isize,
     was_off: isize,
@@ -1106,7 +1104,7 @@ pub unsafe fn get_glyph_shape(
    let data: *mut stbtt_uint8 = (*info).data;
    let mut vertices: *mut stbtt_vertex=null_mut();
    let mut num_vertices: isize =0;
-   let g: isize = stbtt__GetGlyfOffset(info, glyph_index);
+   let g: isize = get_glyph_offset(info, glyph_index);
 
    *pvertices = null_mut();
 
@@ -1217,7 +1215,7 @@ pub unsafe fn get_glyph_shape(
          y     = (*vertices.offset(off as isize +i as isize)).y as i32;
          if (next_move == i) {
             if (i != 0) {
-               num_vertices = stbtt__close_shape(vertices,
+               num_vertices = close_shape(vertices,
                    num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
             }
 
@@ -1269,7 +1267,7 @@ pub unsafe fn get_glyph_shape(
             }
          }
       }
-      num_vertices = stbtt__close_shape(vertices, num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
+      num_vertices = close_shape(vertices, num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
    } else if (number_of_contours == -1) {
       // Compound shapes.
       let mut more: isize = 1;
@@ -1447,7 +1445,7 @@ pub unsafe fn get_codepoint_kern_advance(
    if (*info).kern == 0 { // if no kerning table, don't waste time looking up both codepoint->glyphs
       return 0;
    }
-   return get_glyph_kern_advance(info, stbtt_FindGlyphIndex(info,ch1), stbtt_FindGlyphIndex(info,ch2));
+   return get_glyph_kern_advance(info, find_glyph_index(info,ch1), find_glyph_index(info,ch2));
 }
 
 // leftSideBearing is the offset from the current horizontal position to the left edge of the character
@@ -1459,7 +1457,7 @@ pub unsafe fn get_codepoint_hmetrics(
     advance_width: *mut isize,
     left_side_bearing: *mut isize
 ) {
-   get_glyph_hmetrics(info, stbtt_FindGlyphIndex(info,codepoint), advance_width, left_side_bearing);
+   get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
 }
 
 // ascent is the coordinate above the baseline the font extends; descent
@@ -1557,7 +1555,7 @@ pub unsafe fn get_glyph_bitmap_box_subpixel(
    let mut y0: isize = 0;
    let mut x1: isize = 0;
    let mut y1: isize = 0;
-   if stbtt_GetGlyphBox(font, glyph, &mut x0,&mut y0,&mut x1,&mut y1) == 0 {
+   if get_glyph_box(font, glyph, &mut x0,&mut y0,&mut x1,&mut y1) == 0 {
       // e.g. space character
       if ix0 != null_mut() { *ix0 = 0; }
       if iy0 != null_mut() { *iy0 = 0; }
@@ -1599,7 +1597,7 @@ pub unsafe fn get_codepoint_bitmap_box_subpixel(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   get_glyph_bitmap_box_subpixel(font, stbtt_FindGlyphIndex(font,codepoint), scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
+   get_glyph_bitmap_box_subpixel(font, find_glyph_index(font,codepoint), scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
 }
 
 // get the bbox of the bitmap centered around the glyph origin; so the
@@ -2758,7 +2756,7 @@ pub unsafe fn get_codepoint_bitmap_subpixel(
     yoff: *mut isize
 ) -> *mut u8 {
    return get_glyph_bitmap_subpixel(info, scale_x,
-       scale_y,shift_x,shift_y, stbtt_FindGlyphIndex(info,codepoint), width,height,xoff,yoff);
+       scale_y,shift_x,shift_y, find_glyph_index(info,codepoint), width,height,xoff,yoff);
 }
 
 // same as stbtt_MakeCodepointBitmap, but you can specify a subpixel
@@ -2777,7 +2775,7 @@ pub unsafe fn make_codepoint_bitmap_subpixel(
 ) {
    make_glyph_bitmap_subpixel(info, output, out_w, out_h,
        out_stride, scale_x, scale_y, shift_x, shift_y,
-       stbtt_FindGlyphIndex(info,codepoint));
+       find_glyph_index(info,codepoint));
 }
 
 // allocates a large-enough single-channel 8bpp bitmap and renders the
@@ -2853,7 +2851,7 @@ pub unsafe fn bake_font_bitmap(
        index_map: 0,
        indexToLocFormat: 0,
     };
-    if stbtt_InitFont(&mut f, data, offset) == 0 {
+    if init_font(&mut f, data, offset) == 0 {
          return -1;
     }
    STBTT_memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
@@ -2872,7 +2870,7 @@ pub unsafe fn bake_font_bitmap(
       let mut y1: isize = 0;
       let gw: isize;
       let gh: isize;
-      let g: isize = stbtt_FindGlyphIndex(&f, first_char + i);
+      let g: isize = find_glyph_index(&f, first_char + i);
       get_glyph_hmetrics(&f, g, &mut advance, &mut lsb);
       get_glyph_bitmap_box(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
       gw = x1-x0;
@@ -3321,7 +3319,7 @@ pub unsafe fn pack_font_ranges_gather_rects(
              } else {
                 *(*ranges.offset(i)).array_of_unicode_codepoints.offset(j)
              };
-         let glyph: isize = stbtt_FindGlyphIndex(info, codepoint);
+         let glyph: isize = find_glyph_index(info, codepoint);
          get_glyph_bitmap_box_subpixel(info,glyph,
                                          scale * (*spc).h_oversample as f32,
                                          scale * (*spc).v_oversample as f32,
@@ -3383,7 +3381,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
                 } else {
                     (*(*ranges.offset(i)).array_of_unicode_codepoints.offset(j))
                 };
-            let glyph: isize = stbtt_FindGlyphIndex(info, codepoint);
+            let glyph: isize = find_glyph_index(info, codepoint);
             let pad: Coord = (*spc).padding as Coord;
 
             // pad on left and top
@@ -3502,7 +3500,7 @@ pub unsafe fn pack_font_ranges(
       return 0;
    }
 
-   stbtt_InitFont(&mut info, fontdata, stbtt_GetFontOffsetForIndex(fontdata,font_index) as isize);
+   init_font(&mut info, fontdata, get_font_offset_for_index(fontdata,font_index) as isize);
 
    n = pack_font_ranges_gather_rects(spc, &mut info, ranges, num_ranges, rects);
 
@@ -3679,7 +3677,7 @@ pub unsafe fn get_font_name_string(
    let string_offset: stbtt_int32;
    let fc: *const stbtt_uint8 = (*font).data;
    let offset: stbtt_uint32 = (*font).fontstart as u32;
-   let nm: stbtt_uint32 = stbtt__find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   let nm: stbtt_uint32 = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
    if nm == 0 { return null(); }
 
    count = ttUSHORT!(fc.offset(nm as isize +2)) as i32;
@@ -3767,15 +3765,15 @@ pub unsafe fn matches(
     let nlen: stbtt_int32 = STBTT_strlen(name as *mut c_char) as stbtt_int32;
     let nm: stbtt_uint32;
     let hd: stbtt_uint32;
-   if (stbtt__isfont(fc.offset(offset as isize)) == 0) { return 0; }
+   if (isfont(fc.offset(offset as isize)) == 0) { return 0; }
 
    // check italics/bold/underline flags in macStyle...
    if (flags != 0) {
-      hd = stbtt__find_table(fc, offset, CString::new("head").unwrap().as_ptr());
+      hd = find_table(fc, offset, CString::new("head").unwrap().as_ptr());
       if ((ttUSHORT!(fc.offset(hd as isize + 44)) & 7) != (flags as u16 & 7)) { return 0; }
    }
 
-   nm = stbtt__find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   nm = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
    if (nm == 0) { return 0; }
 
    if (flags != 0) {
@@ -3802,7 +3800,7 @@ pub unsafe fn find_matching_font(
     flags: stbtt_int32
 ) -> i32 {
    for i in 0.. {
-      let off: stbtt_int32 = stbtt_GetFontOffsetForIndex(font_collection, i);
+      let off: stbtt_int32 = get_font_offset_for_index(font_collection, i);
       if off < 0 { return off; }
       if (matches(font_collection as *mut stbtt_uint8,
             off as stbtt_uint32, name_utf8 as *mut stbtt_uint8, flags) != 0) {

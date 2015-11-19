@@ -572,20 +572,20 @@ enum STBTT_UNICODE_EID { // encoding_id for STBTT_PLATFORM_ID_UNICODE
    UNICODE_2_0_FULL=4
 }
 
-enum STBTT_MS_EID { // encoding_id for STBTT_PLATFORM_ID_MICROSOFT
-   SYMBOL        =0,
-   UNICODE_BMP   =1,
-   SHIFTJIS      =2,
-   UNICODE_FULL  =10
+enum MsEid { // encoding_id for STBTT_PLATFORM_ID_MICROSOFT
+   Symbol        =0,
+   UnicodeBmp    =1,
+   ShiftJIS      =2,
+   UnicodeFull   =10
 }
 
-impl From<u16> for STBTT_MS_EID {
-    fn from(val: u16) -> STBTT_MS_EID {
+impl From<u16> for MsEid {
+    fn from(val: u16) -> MsEid {
         match val {
-            0 => STBTT_MS_EID::SYMBOL,
-            1 => STBTT_MS_EID::UNICODE_BMP,
-            2 => STBTT_MS_EID::SHIFTJIS,
-            10 => STBTT_MS_EID::UNICODE_FULL,
+            0 => MsEid::Symbol,
+            1 => MsEid::UnicodeBmp,
+            2 => MsEid::ShiftJIS,
+            10 => MsEid::UnicodeFull,
             _ => panic!("Unknown STBTT_MS_EID")
         }
     }
@@ -820,10 +820,10 @@ pub unsafe fn init_font(
       let val: STBTT_PLATFORM_ID = ttUSHORT!(data.offset(encoding_record as isize)).into();
       match val {
          STBTT_PLATFORM_ID::MICROSOFT => {
-             let val: STBTT_MS_EID = ttUSHORT!(data.offset(encoding_record as isize +2)).into();
+             let val: MsEid = ttUSHORT!(data.offset(encoding_record as isize +2)).into();
             match val {
-               STBTT_MS_EID::UNICODE_BMP
-               | STBTT_MS_EID::UNICODE_FULL => {
+               MsEid::UnicodeBmp
+               | MsEid::UnicodeFull => {
                   // MS/Unicode
                   (*info).index_map = cmap as isize + ttULONG!(data.offset(encoding_record as isize +4)) as isize;
                }

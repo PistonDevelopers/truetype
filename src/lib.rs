@@ -321,7 +321,7 @@ use std::ptr::copy as STBTT_memcpy;
 
 //   #define STBTT_memset       memset
 
-fn STBTT_memset(buf: *mut c_void, b: u8, count: usize) {
+fn memset(buf: *mut c_void, b: u8, count: usize) {
     let buf = buf as *mut u8;
     for idx in 0..count {
         unsafe {
@@ -344,7 +344,7 @@ fn STBTT_memset(buf: *mut c_void, b: u8, count: usize) {
 // If you use this API, you only have to call two functions ever.
 //
 
-pub struct stbtt_bakedchar {
+pub struct BakedChar {
     // coordinates of bbox in bitmap
     x0: u16,
     y0: u16,
@@ -355,7 +355,7 @@ pub struct stbtt_bakedchar {
     xadvance: f32,
 }
 
-pub struct stbtt_aligned_quad {
+pub struct AlignedQuad {
     // top-left
     x0: f32,
     y0: f32,
@@ -375,7 +375,7 @@ pub struct stbtt_aligned_quad {
 // This provides options for packing multiple fonts into one atlas, not
 // perfectly but better than nothing.
 
-pub struct stbtt_packedchar {
+pub struct PackedChar {
     // coordinates of bbox in bitmap
     x0: u16,
     y0: u16,
@@ -391,7 +391,7 @@ pub struct stbtt_packedchar {
 // TODO: Macro
 // #define STBTT_POINT_SIZE(x)   (-(x))
 
-pub struct stbtt_pack_range {
+pub struct PackRange {
    font_size: f32,
    // if non-zero, then the chars are continuous, and this is the first codepoint
    first_unicode_codepoint_in_range: isize,
@@ -399,7 +399,7 @@ pub struct stbtt_pack_range {
    array_of_unicode_codepoints: *const isize,
    num_chars: isize,
    // output
-   chardata_for_range: *mut stbtt_packedchar,
+   chardata_for_range: *mut PackedChar,
    // don't set these, they're used internally
    h_oversample: u8,
    v_oversample: u8,
@@ -407,7 +407,7 @@ pub struct stbtt_pack_range {
 
 // this is an opaque structure that you shouldn't mess with which holds
 // all the context needed from PackBegin to PackEnd.
-pub struct stbtt_pack_context {
+pub struct PackContext {
    user_allocator_context: *const (),
    pack_info: *mut c_void,
    width: isize,
@@ -428,14 +428,14 @@ pub struct stbtt_pack_context {
 
 // The following structure is defined publically so you can declare one on
 // the stack or as a global or etc, but you should treat it as opaque.
-pub struct stbtt_fontinfo {
+pub struct FontInfo {
    userdata: *const (),
    // pointer to .ttf file
    data: *mut u8,
    // offset of start of font
    fontstart: isize,
    // number of glyphs, needed for range checking
-   numGlyphs: isize,
+   num_glyphs: isize,
 
    // table locations as offset from start of .ttf
    loca: isize,
@@ -447,19 +447,19 @@ pub struct stbtt_fontinfo {
    // a cmap mapping for our chosen character encoding
    index_map: isize,
    // format needed to map from glyph index to glyph
-   indexToLocFormat: isize,
+   index_to_loc_format: isize,
 }
 
-impl stbtt_fontinfo {
-    pub fn uninitialized() -> stbtt_fontinfo {
-        stbtt_fontinfo{
+impl FontInfo {
+    pub fn uninitialized() -> FontInfo {
+        FontInfo{
             userdata: null(),
            // pointer to .ttf file
            data: null_mut(),
            // offset of start of font
            fontstart: 0,
            // number of glyphs, needed for range checking
-           numGlyphs: 0,
+           num_glyphs: 0,
 
            // table locations as offset from start of .ttf
            loca: 0,
@@ -471,7 +471,7 @@ impl stbtt_fontinfo {
            // a cmap mapping for our chosen character encoding
            index_map: 0,
            // format needed to map from glyph index to glyph
-           indexToLocFormat: 0,
+           index_to_loc_format: 0,
         }
     }
 }
@@ -764,11 +764,11 @@ pub unsafe fn get_font_offset_for_index(
 
 // Given an offset into the file that defines a font, this function builds
 // the necessary cached info for the rest of the system. You must allocate
-// the stbtt_fontinfo yourself, and stbtt_InitFont will fill it out. You don't
+// the FontInfo yourself, and stbtt_InitFont will fill it out. You don't
 // need to do anything special to free it, because the contents are pure
 // value data with no additional data structures. Returns 0 on failure.
 pub unsafe fn init_font(
-    info: *mut stbtt_fontinfo,
+    info: *mut FontInfo,
     data2: *mut u8,
     fontstart: isize
 ) -> isize {
@@ -806,9 +806,9 @@ pub unsafe fn init_font(
    t = find_table(data, fontstart as u32,
        "maxp".as_ptr() as *const c_char);
    if t != 0 {
-      (*info).numGlyphs = ttUSHORT!(data.offset(t as isize +4)) as isize;
+      (*info).num_glyphs = ttUSHORT!(data.offset(t as isize +4)) as isize;
    } else {
-      (*info).numGlyphs = 0xffff;
+      (*info).num_glyphs = 0xffff;
    }
 
    // find a cmap encoding table we understand *now* to avoid searching
@@ -848,7 +848,7 @@ pub unsafe fn init_font(
       return 0;
    }
 
-   (*info).indexToLocFormat = ttUSHORT!(data.offset((*info).head + 50)) as isize;
+   (*info).index_to_loc_format = ttUSHORT!(data.offset((*info).head + 50)) as isize;
    return 1;
 }
 
@@ -857,7 +857,7 @@ pub unsafe fn init_font(
 // going to process, then use glyph-based functions instead of the
 // codepoint-based functions.
 pub unsafe fn find_glyph_index(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     unicode_codepoint: isize
 ) -> isize {
    let data: *mut stbtt_uint8 = (*info).data;
@@ -975,7 +975,7 @@ pub unsafe fn find_glyph_index(
 }
 
 pub unsafe fn get_codepoint_shape(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     unicode_codepoint: isize,
      vertices: *mut *mut Vertex
 ) -> isize {
@@ -998,16 +998,16 @@ pub unsafe fn stbtt_setvertex(
 }
 
 pub unsafe fn get_glyph_offset(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
    let g1: isize;
    let g2: isize;
 
-   if glyph_index >= (*info).numGlyphs { return -1; } // glyph index out of range
-   if (*info).indexToLocFormat >= 2   { return -1; } // unknown index->glyph map format
+   if glyph_index >= (*info).num_glyphs { return -1; } // glyph index out of range
+   if (*info).index_to_loc_format >= 2   { return -1; } // unknown index->glyph map format
 
-   if (*info).indexToLocFormat == 0 {
+   if (*info).index_to_loc_format == 0 {
       g1 = (*info).glyf + ttUSHORT!((*info).data.offset((*info).loca + glyph_index * 2)) as isize * 2;
       g2 = (*info).glyf + ttUSHORT!((*info).data.offset((*info).loca + glyph_index * 2 + 2)) as isize * 2;
    } else {
@@ -1020,7 +1020,7 @@ pub unsafe fn get_glyph_offset(
 
 // as above, but takes one or more glyph indices for greater efficiency
 pub unsafe fn get_glyph_box(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     glyph_index: isize,
     x0: *mut isize,
     y0: *mut isize,
@@ -1039,7 +1039,7 @@ pub unsafe fn get_glyph_box(
 
 // Gets the bounding box of the visible part of the glyph, in unscaled coordinates
 pub unsafe fn get_codepoint_box(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     codepoint: isize,
     x0: *mut isize,
     y0: *mut isize,
@@ -1051,7 +1051,7 @@ pub unsafe fn get_codepoint_box(
 
 // returns non-zero if nothing is drawn for this glyph
 pub unsafe fn is_glyph_empty(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
    let number_of_contours: stbtt_int16;
@@ -1103,7 +1103,7 @@ pub unsafe fn close_shape(
 // draws a quadratic bezier from previous endpoint to
 // its x,y, using cx,cy as the bezier control point.
 pub unsafe fn get_glyph_shape(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     glyph_index: isize,
     pvertices: *mut *mut Vertex
 ) -> isize {
@@ -1379,7 +1379,7 @@ pub unsafe fn get_glyph_shape(
 }
 
 pub unsafe fn get_glyph_hmetrics(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     glyph_index: isize,
     advance_width: *mut isize,
     left_side_bearing: *mut isize
@@ -1404,7 +1404,7 @@ pub unsafe fn get_glyph_hmetrics(
 }
 
 pub unsafe fn get_glyph_kern_advance(
-    info: *mut stbtt_fontinfo,
+    info: *mut FontInfo,
     glyph1: isize,
     glyph2: isize
 ) -> isize {
@@ -1446,7 +1446,7 @@ pub unsafe fn get_glyph_kern_advance(
 
 // an additional amount to add to the 'advance' value between ch1 and ch2
 pub unsafe fn get_codepoint_kern_advance(
-    info: *mut stbtt_fontinfo,
+    info: *mut FontInfo,
     ch1: isize,
     ch2: isize
 ) -> isize {
@@ -1460,7 +1460,7 @@ pub unsafe fn get_codepoint_kern_advance(
 // advanceWidth is the offset from the current horizontal position to the next horizontal position
 //   these are expressed in unscaled coordinates
 pub unsafe fn get_codepoint_hmetrics(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     codepoint: isize,
     advance_width: *mut isize,
     left_side_bearing: *mut isize
@@ -1475,7 +1475,7 @@ pub unsafe fn get_codepoint_hmetrics(
 //   these are expressed in unscaled coordinates, so you must multiply by
 //   the scale factor for a given size
 pub unsafe fn get_font_vmetrics(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     ascent: *mut isize,
     descent: *mut isize,
     line_gap: *mut isize
@@ -1493,7 +1493,7 @@ pub unsafe fn get_font_vmetrics(
 
 // the bounding box around all possible characters
 pub unsafe fn get_font_bounding_box(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     x0: *mut isize,
     y0: *mut isize,
     x1: *mut isize,
@@ -1512,7 +1512,7 @@ pub unsafe fn get_font_bounding_box(
 //       scale = pixels / (ascent - descent)
 // so if you prefer to measure height by the ascent only, use a similar calculation.
 pub unsafe fn scale_for_pixel_height(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     height: f32
 ) -> f32 {
    let fheight = ttSHORT!((*info).data.offset((*info).hhea + 4))
@@ -1524,7 +1524,7 @@ pub unsafe fn scale_for_pixel_height(
 // 'pixels' tall. This is probably what traditional APIs compute, but
 // I'm not positive.
 pub unsafe fn scale_for_mapping_em_to_pixels(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     pixels: f32
 ) -> f32 {
    let units_per_em = ttUSHORT!((*info).data.offset((*info).head + 18));
@@ -1537,7 +1537,7 @@ pub unsafe fn scale_for_mapping_em_to_pixels(
 //
 // BITMAP RENDERING
 //
-pub unsafe fn free_shape(_info: *const stbtt_fontinfo, v: *mut Vertex)
+pub unsafe fn free_shape(_info: *const FontInfo, v: *mut Vertex)
 {
    STBTT_free!(v as *mut c_void);
 }
@@ -1548,7 +1548,7 @@ pub unsafe fn free_shape(_info: *const stbtt_fontinfo, v: *mut Vertex)
 //
 
 pub unsafe fn get_glyph_bitmap_box_subpixel(
-    font: *const stbtt_fontinfo,
+    font: *const FontInfo,
     glyph: isize,
     scale_x: f32,
     scale_y: f32,
@@ -1579,7 +1579,7 @@ pub unsafe fn get_glyph_bitmap_box_subpixel(
 }
 
 pub unsafe fn get_glyph_bitmap_box(
-    font: *const stbtt_fontinfo,
+    font: *const FontInfo,
     glyph: isize,
     scale_x: f32,
     scale_y: f32,
@@ -1594,7 +1594,7 @@ pub unsafe fn get_glyph_bitmap_box(
 // same as stbtt_GetCodepointBitmapBox, but you can specify a subpixel
 // shift for the character
 pub unsafe fn get_codepoint_bitmap_box_subpixel(
-    font: *const stbtt_fontinfo,
+    font: *const FontInfo,
     codepoint: isize,
     scale_x: f32,
     scale_y: f32,
@@ -1614,7 +1614,7 @@ pub unsafe fn get_codepoint_bitmap_box_subpixel(
 // (Note that the bitmap uses y-increases-down, but the shape uses
 // y-increases-up, so CodepointBitmapBox and CodepointBox are inverted.)
 pub unsafe fn get_codepoint_bitmap_box(
-    font: *const stbtt_fontinfo,
+    font: *const FontInfo,
     codepoint: isize,
     scale_x: f32,
     scale_y: f32,
@@ -2189,8 +2189,8 @@ pub unsafe fn rasterize_sorted_edges(
       let scan_y_bottom: f32 = y as f32 + 1.0;
       let mut step: *mut *mut ActiveEdge = &mut active;
 
-      STBTT_memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
-      STBTT_memset(scanline2 as *mut c_void, 0,
+      memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
+      memset(scanline2 as *mut c_void, 0,
           ((*result).w+1) as usize * size_of::<f32>());
 
       // update all active edges;
@@ -2628,7 +2628,7 @@ pub unsafe fn free_bitmap(bitmap: *mut u8, _userdata: *const ())
 }
 
 pub unsafe fn get_glyph_bitmap_subpixel(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     mut scale_x: f32,
     mut scale_y: f32,
     shift_x: f32,
@@ -2687,7 +2687,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
 // on glyph indices instead of Unicode codepoints (for efficiency)
 
 pub unsafe fn get_glyph_bitmap(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     scale_x: f32,
     scale_y: f32,
     glyph: isize,
@@ -2701,7 +2701,7 @@ pub unsafe fn get_glyph_bitmap(
 }
 
 pub unsafe fn make_glyph_bitmap_subpixel(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2736,7 +2736,7 @@ pub unsafe fn make_glyph_bitmap_subpixel(
 }
 
 pub unsafe fn make_glyph_bitmap(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2752,7 +2752,7 @@ pub unsafe fn make_glyph_bitmap(
 // the same as stbtt_GetCodepoitnBitmap, but you can specify a subpixel
 // shift for the character
 pub unsafe fn get_codepoint_bitmap_subpixel(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     scale_x: f32,
     scale_y: f32,
     shift_x: f32,
@@ -2770,7 +2770,7 @@ pub unsafe fn get_codepoint_bitmap_subpixel(
 // same as stbtt_MakeCodepointBitmap, but you can specify a subpixel
 // shift for the character
 pub unsafe fn make_codepoint_bitmap_subpixel(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2794,7 +2794,7 @@ pub unsafe fn make_codepoint_bitmap_subpixel(
 //
 // xoff/yoff are the offset it pixel space from the glyph origin to the top-left of the bitmap
 pub unsafe fn get_codepoint_bitmap(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     scale_x: f32,
     scale_y: f32,
     codepoint: isize,
@@ -2812,7 +2812,7 @@ pub unsafe fn get_codepoint_bitmap(
 // is clipped to out_w/out_h bytes. Call stbtt_GetCodepointBitmapBox to get the
 // width and height and positioning info for it first.
 pub unsafe fn make_codepoint_bitmap(
-    info: *const stbtt_fontinfo,
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2839,17 +2839,17 @@ pub unsafe fn bake_font_bitmap(
     pixel_height: f32,                     // height of font in pixels
     pixels: *mut u8, pw: isize, ph: isize,  // bitmap to be filled in
     first_char: isize, num_chars: isize,          // characters to bake
-    chardata: *mut stbtt_bakedchar
+    chardata: *mut BakedChar
 ) -> isize {
     let scale: f32;
     let mut x: isize;
     let mut y: isize;
     let mut bottom_y: isize;
-    let mut f: stbtt_fontinfo = stbtt_fontinfo {
+    let mut f: FontInfo = FontInfo {
        userdata: null(),
        data: null_mut(),
        fontstart: 0,
-       numGlyphs: 0,
+       num_glyphs: 0,
        loca: 0,
        head: 0,
        glyf: 0,
@@ -2857,12 +2857,12 @@ pub unsafe fn bake_font_bitmap(
        hmtx: 0,
        kern: 0,
        index_map: 0,
-       indexToLocFormat: 0,
+       index_to_loc_format: 0,
     };
     if init_font(&mut f, data, offset) == 0 {
          return -1;
     }
-   STBTT_memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+   memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    x=1;
    y=1;
    bottom_y = 1;
@@ -2918,7 +2918,7 @@ pub unsafe fn bake_font_bitmap(
 //
 // It's inefficient; you might want to c&p it and optimize it.
 pub unsafe fn get_baked_quad(
-    chardata: *mut stbtt_bakedchar,
+    chardata: *mut BakedChar,
     pw: isize,
     ph: isize,
     // character to display
@@ -2926,14 +2926,14 @@ pub unsafe fn get_baked_quad(
     // pointers to current position in screen pixel space
     xpos: *mut f32,
     ypos: *const f32,
-    q: *mut stbtt_aligned_quad, // output: quad to draw
+    q: *mut AlignedQuad, // output: quad to draw
     opengl_fillrule: isize
 )
 {
    let d3d_bias: f32 = if opengl_fillrule != 0 { 0.0 } else { -0.5 };
    let ipw: f32 = 1.0 / pw as f32;
    let iph = 1.0 / ph as f32;
-   let b: *mut stbtt_bakedchar = chardata.offset(char_index);
+   let b: *mut BakedChar = chardata.offset(char_index);
    let round_x: isize = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5);
    let round_y: isize = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5);
 
@@ -3056,7 +3056,7 @@ pub unsafe fn stbrp_pack_rects(
 // This is SUPER-AWESOME (tm Ryan Gordon) packing using stb_rect_pack.h. If
 // stb_rect_pack.h isn't available, it uses the BakeFontBitmap strategy.
 
-// Initializes a packing context stored in the passed-in stbtt_pack_context.
+// Initializes a packing context stored in the passed-in PackContext.
 // Future calls using this context will pack characters into the bitmap passed
 // in here: a 1-channel bitmap that is weight x height. stride_in_bytes is
 // the distance from one row to the next (or 0 to mean they are packed tightly
@@ -3066,7 +3066,7 @@ pub unsafe fn stbrp_pack_rects(
 //
 // Returns 0 on failure, 1 on success.
 pub unsafe fn pack_begin(
-    spc: *mut stbtt_pack_context,
+    spc: *mut PackContext,
     pixels: *mut u8,
     pw: isize,
     ph: isize,
@@ -3101,14 +3101,14 @@ pub unsafe fn pack_begin(
    stbrp_init_target(context, pw-padding, ph-padding, nodes, num_nodes);
 
    if pixels != null_mut() {
-      STBTT_memset(pixels as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+      memset(pixels as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    }
 
    return 1;
 }
 
 // Cleans up the packing context and frees all memory.
-pub unsafe fn pack_end(spc: *mut stbtt_pack_context)
+pub unsafe fn pack_end(spc: *mut PackContext)
 {
    STBTT_free!((*spc).nodes);
    STBTT_free!((*spc).pack_info);
@@ -3129,7 +3129,7 @@ pub unsafe fn pack_end(spc: *mut stbtt_pack_context)
 // To use with PackFontRangesGather etc., you must set it before calls
 // call to PackFontRangesGatherRects.
 pub unsafe fn pack_set_oversampling(
-    spc: *mut stbtt_pack_context,
+    spc: *mut PackContext,
     h_oversample: usize,
     v_oversample: usize)
 {
@@ -3156,7 +3156,7 @@ pub unsafe fn h_prefilter(
    let safe_w: isize = w - kernel_width as isize;
    for _ in 0..h {
       let mut total: usize;
-      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
+      memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 
@@ -3220,7 +3220,7 @@ pub unsafe fn v_prefilter(
    let safe_h: isize = h - kernel_width as isize;
    for _ in 0..w {
       let mut total: usize;
-      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
+      memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 
@@ -3302,9 +3302,9 @@ pub fn oversample_shift(oversample: isize) -> f32
 
 // rects array must be big enough to accommodate all characters in the given ranges
 pub unsafe fn pack_font_ranges_gather_rects(
-    spc: *mut stbtt_pack_context,
-    info: *mut stbtt_fontinfo,
-    ranges: *mut stbtt_pack_range,
+    spc: *mut PackContext,
+    info: *mut FontInfo,
+    ranges: *mut PackRange,
     num_ranges: isize,
     rects: *mut Rect
 ) -> isize {
@@ -3344,9 +3344,9 @@ pub unsafe fn pack_font_ranges_gather_rects(
 
 // rects array must be big enough to accommodate all characters in the given ranges
 pub unsafe fn pack_font_ranges_render_into_rects(
-    spc: *mut stbtt_pack_context,
-    info: *mut stbtt_fontinfo,
-    ranges: *mut stbtt_pack_range,
+    spc: *mut PackContext,
+    info: *mut FontInfo,
+    ranges: *mut PackRange,
     num_ranges: isize,
     rects: *mut Rect
 ) -> isize {
@@ -3376,7 +3376,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
       for j in 0..(*ranges.offset(i)).num_chars {
          let r: *mut Rect = rects.offset(k);
          if ((*r).was_packed != 0) {
-            let bc: *mut stbtt_packedchar = (*ranges.offset(i)).chardata_for_range.offset(j);
+            let bc: *mut PackedChar = (*ranges.offset(i)).chardata_for_range.offset(j);
             let mut advance: isize = 0;
             let mut lsb: isize = 0;
             let mut x0: isize = 0;
@@ -3449,7 +3449,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
 }
 
 pub unsafe fn pack_font_ranges_pack_rects(
-    spc: *mut stbtt_pack_context,
+    spc: *mut PackContext,
     rects: *mut Rect,
     num_rects: isize)
 {
@@ -3461,19 +3461,19 @@ pub unsafe fn pack_font_ranges_pack_rects(
 // calls to stbtt_PackFontRange. Note that you can call this multiple
 // times within a single PackBegin/PackEnd.
 pub unsafe fn pack_font_ranges(
-    spc: *mut stbtt_pack_context,
+    spc: *mut PackContext,
     fontdata: *mut u8,
     font_index: isize,
-    ranges: *mut stbtt_pack_range,
+    ranges: *mut PackRange,
     num_ranges: isize
 ) -> isize
 {
-   let mut info: stbtt_fontinfo = stbtt_fontinfo {
+   let mut info: FontInfo = FontInfo {
       userdata: null(),
       // pointer to .ttf file
       data: null_mut(),
       fontstart: 0,
-      numGlyphs: 0,
+      num_glyphs: 0,
       loca: 0,
       head: 0,
       glyf: 0,
@@ -3481,7 +3481,7 @@ pub unsafe fn pack_font_ranges(
       hmtx: 0,
       kern: 0,
       index_map: 0,
-      indexToLocFormat: 0,
+      index_to_loc_format: 0,
    };
    let mut n: isize;
    //stbrp_context *context = (stbrp_context *) spc->pack_info;
@@ -3533,15 +3533,15 @@ pub unsafe fn pack_font_ranges(
 //       ...,                  20 , ... // font max minus min y is 20 pixels tall
 //       ..., STBTT_POINT_SIZE(20), ... // 'M' is 20 pixels tall
 pub unsafe fn pack_font_range(
-    spc: *mut stbtt_pack_context,
+    spc: *mut PackContext,
     fontdata: *mut u8,
     font_index: isize,
     font_size: f32,
     first_unicode_codepoint_in_range: isize,
     num_chars_in_range: isize,
-    chardata_for_range: *mut stbtt_packedchar
+    chardata_for_range: *mut PackedChar
 ) -> isize {
-   let mut range: stbtt_pack_range = stbtt_pack_range {
+   let mut range: PackRange = PackRange {
        first_unicode_codepoint_in_range: first_unicode_codepoint_in_range,
        array_of_unicode_codepoints: null(),
        num_chars: num_chars_in_range,
@@ -3554,7 +3554,7 @@ pub unsafe fn pack_font_range(
 }
 
 pub unsafe fn get_packed_quad(
-    chardata: *mut stbtt_packedchar,
+    chardata: *mut PackedChar,
     pw: isize,
     ph: isize,
     // character to display
@@ -3563,12 +3563,12 @@ pub unsafe fn get_packed_quad(
     xpos: *mut f32,
     ypos: *mut f32,
     // output: quad to draw
-    q: *mut stbtt_aligned_quad,
+    q: *mut AlignedQuad,
     align_to_integer: isize
 ) {
    let ipw: f32 = 1.0 / pw as f32;
    let iph: f32 = 1.0 / ph as f32;
-   let b: *const stbtt_packedchar = chardata.offset(char_index);
+   let b: *const PackedChar = chardata.offset(char_index);
 
    if (align_to_integer != 0) {
       let x: f32 = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5) as f32;
@@ -3674,7 +3674,7 @@ pub unsafe fn compare_utf8_to_utf16_bigendian(
 // returns results in whatever encoding you request... but note that 2-byte encodings
 // will be BIG-ENDIAN... use stbtt_CompareUTF8toUTF16_bigendian() to compare
 pub unsafe fn get_font_name_string(
-    font: *const stbtt_fontinfo,
+    font: *const FontInfo,
     length: *mut isize,
     platform_id: isize,
     encoding_id: isize,

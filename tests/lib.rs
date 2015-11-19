@@ -6,7 +6,7 @@ use piston_truetype::*;
 #[test]
 fn draw_capital_a() {
     unsafe {
-        let mut font = stbtt_fontinfo::uninitialized();
+        let mut font = FontInfo::uninitialized();
         let c = 'A' as u8;
         let s = 20.0;
         let mut ttf_buffer = include_bytes!("Tuffy_Bold.ttf").to_vec();

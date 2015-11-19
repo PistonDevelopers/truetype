@@ -545,20 +545,20 @@ const STBTT_MACSTYLE_ITALIC: u8 = 2;
 const STBTT_MACSTYLE_UNDERSCORE: u8 = 4;
 const STBTT_MACSTYLE_NONE: u8 = 8;   // <= not same as 0, this makes us check the bitfield is 0
 
-enum STBTT_PLATFORM_ID { // platform_id
-   UNICODE   =0,
-   MAC       =1,
-   ISO       =2,
-   MICROSOFT =3
+enum PlatformId { // platform_id
+   Unicode   =0,
+   Mac       =1,
+   Iso       =2,
+   Microsoft =3
 }
 
-impl From<u16> for STBTT_PLATFORM_ID {
-    fn from(val: u16) -> STBTT_PLATFORM_ID {
+impl From<u16> for PlatformId {
+    fn from(val: u16) -> PlatformId {
         match val {
-            0 => STBTT_PLATFORM_ID::UNICODE,
-            1 => STBTT_PLATFORM_ID::MAC,
-            2 => STBTT_PLATFORM_ID::ISO,
-            3 => STBTT_PLATFORM_ID::MICROSOFT,
+            0 => PlatformId::Unicode,
+            1 => PlatformId::Mac,
+            2 => PlatformId::Iso,
+            3 => PlatformId::Microsoft,
             _ => panic!("Unknown STBTT_PLATFORM_ID")
         }
     }
@@ -819,9 +819,9 @@ pub unsafe fn init_font(
    for i in 0..num_tables {
       let encoding_record: stbtt_uint32 = cmap + 4 + 8 * i as u32;
       // find an encoding we understand:
-      let val: STBTT_PLATFORM_ID = ttUSHORT!(data.offset(encoding_record as isize)).into();
+      let val: PlatformId = ttUSHORT!(data.offset(encoding_record as isize)).into();
       match val {
-         STBTT_PLATFORM_ID::MICROSOFT => {
+         PlatformId::Microsoft => {
              let val: MsEid = ttUSHORT!(data.offset(encoding_record as isize +2)).into();
             match val {
                MsEid::UnicodeBmp
@@ -834,7 +834,7 @@ pub unsafe fn init_font(
                }
             }
         }
-        STBTT_PLATFORM_ID::UNICODE => {
+        PlatformId::Unicode => {
             // Mac/iOS has these
             // all the encodingIDs are unicode, so we don't bother to check it
             (*info).index_map = cmap as isize + ttULONG!(data.offset(encoding_record as isize +4)) as isize;

@@ -591,13 +591,16 @@ impl From<u16> for STBTT_MS_EID {
     }
 }
 
+/*
 enum STBTT_MAC_EID { // encoding_id for STBTT_PLATFORM_ID_MAC; same as Script Manager codes
    ROMAN        =0,   ARABIC       =4,
    JAPANESE     =1,   HEBREW       =5,
    CHINESE_TRAD =2,   GREEK        =6,
    KOREAN       =3,   RUSSIAN      =7
 }
+*/
 
+/*
 enum STBTT_MS_LANG { // language_id for STBTT_PLATFORM_ID_MICROSOFT; same as LCID...
        // problematic because there are e.g. 16 english LCIDs and 16 arabic LCIDs
    ENGLISH     =0x0409,   ITALIAN     =0x0410,
@@ -607,7 +610,9 @@ enum STBTT_MS_LANG { // language_id for STBTT_PLATFORM_ID_MICROSOFT; same as LCI
    GERMAN      =0x0407,   // TODO: Duplicate, SPANISH     =0x0409,
    HEBREW      =0x040d,   SWEDISH     =0x041D
 }
+*/
 
+/*
 enum STBTT_MAC_LANG { // language_id for STBTT_PLATFORM_ID_MAC
    ENGLISH      =0 ,   JAPANESE     =11,
    ARABIC       =12,   KOREAN       =23,
@@ -617,6 +622,7 @@ enum STBTT_MAC_LANG { // language_id for STBTT_PLATFORM_ID_MAC
    HEBREW       =10,   CHINESE_SIMPLIFIED =33,
    ITALIAN      =3 ,   LANG_CHINESE_TRAD =19
 }
+*/
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -628,7 +634,7 @@ enum STBTT_MAC_LANG { // language_id for STBTT_PLATFORM_ID_MAC
 // Can not be > 255.
 const STBTT_MAX_OVERSAMPLE: usize = 8;
 
-const STBTT_RASTERIZER_VERSION: u8 = 2;
+// const STBTT_RASTERIZER_VERSION: u8 = 2;
 
 //////////////////////////////////////////////////////////////////////////
 //

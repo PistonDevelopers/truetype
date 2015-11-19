@@ -6,7 +6,7 @@ use piston_truetype::*;
 #[test]
 fn draw_capital_a() {
     unsafe {
-        let mut font = stbtt_fontinfo::uninitialized();
+        let mut font = FontInfo::uninitialized();
         let c = 'A' as u8;
         let s = 20.0;
         let mut ttf_buffer = include_bytes!("Tuffy_Bold.ttf").to_vec();
@@ -14,10 +14,10 @@ fn draw_capital_a() {
         let mut w = 0;
         let mut h = 0;
 
-        let offset = stbtt_GetFontOffsetForIndex(ttf_buffer.as_ptr(),0) as isize;
-        stbtt_InitFont(&mut font, ttf_buffer[..].as_mut_ptr(), offset);
-        let scale = stbtt_ScaleForPixelHeight(&font, s);
-        let bitmap = stbtt_GetCodepointBitmap(&font, 0.0,scale, c as isize, &mut w, &mut h, null_mut(),null_mut());
+        let offset = get_font_offset_for_index(ttf_buffer.as_ptr(),0) as isize;
+        init_font(&mut font, ttf_buffer[..].as_mut_ptr(), offset);
+        let scale = scale_for_pixel_height(&font, s);
+        let bitmap = get_codepoint_bitmap(&font, 0.0,scale, c as isize, &mut w, &mut h, null_mut(),null_mut());
 
         let mut result = String::new();
         for j in 0..h {

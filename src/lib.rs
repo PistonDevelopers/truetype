@@ -251,13 +251,6 @@ use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
 
-pub type stbtt_uint8 = u8;
-pub type stbtt_int8 = i8;
-pub type stbtt_uint16 = u16;
-pub type stbtt_int16 = i16;
-pub type stbtt_uint32 = u32;
-pub type stbtt_int32 = i32;
-
 macro_rules! STBTT_ifloor {
     ($x:expr) => {
         $x.floor() as isize
@@ -321,7 +314,7 @@ use std::ptr::copy as STBTT_memcpy;
 
 //   #define STBTT_memset       memset
 
-fn STBTT_memset(buf: *mut c_void, b: u8, count: usize) {
+fn memset(buf: *mut c_void, b: u8, count: usize) {
     let buf = buf as *mut u8;
     for idx in 0..count {
         unsafe {
@@ -344,7 +337,7 @@ fn STBTT_memset(buf: *mut c_void, b: u8, count: usize) {
 // If you use this API, you only have to call two functions ever.
 //
 
-pub struct stbtt_bakedchar {
+pub struct BakedChar {
     // coordinates of bbox in bitmap
     x0: u16,
     y0: u16,
@@ -355,7 +348,7 @@ pub struct stbtt_bakedchar {
     xadvance: f32,
 }
 
-pub struct stbtt_aligned_quad {
+pub struct AlignedQuad {
     // top-left
     x0: f32,
     y0: f32,
@@ -375,7 +368,7 @@ pub struct stbtt_aligned_quad {
 // This provides options for packing multiple fonts into one atlas, not
 // perfectly but better than nothing.
 
-pub struct stbtt_packedchar {
+pub struct PackedChar {
     // coordinates of bbox in bitmap
     x0: u16,
     y0: u16,
@@ -391,7 +384,7 @@ pub struct stbtt_packedchar {
 // TODO: Macro
 // #define STBTT_POINT_SIZE(x)   (-(x))
 
-pub struct stbtt_pack_range {
+pub struct PackRange {
    font_size: f32,
    // if non-zero, then the chars are continuous, and this is the first codepoint
    first_unicode_codepoint_in_range: isize,
@@ -399,7 +392,7 @@ pub struct stbtt_pack_range {
    array_of_unicode_codepoints: *const isize,
    num_chars: isize,
    // output
-   chardata_for_range: *mut stbtt_packedchar,
+   chardata_for_range: *mut PackedChar,
    // don't set these, they're used internally
    h_oversample: u8,
    v_oversample: u8,
@@ -407,7 +400,7 @@ pub struct stbtt_pack_range {
 
 // this is an opaque structure that you shouldn't mess with which holds
 // all the context needed from PackBegin to PackEnd.
-pub struct stbtt_pack_context {
+pub struct PackContext {
    user_allocator_context: *const (),
    pack_info: *mut c_void,
    width: isize,
@@ -428,14 +421,14 @@ pub struct stbtt_pack_context {
 
 // The following structure is defined publically so you can declare one on
 // the stack or as a global or etc, but you should treat it as opaque.
-pub struct stbtt_fontinfo {
+pub struct FontInfo {
    userdata: *const (),
    // pointer to .ttf file
    data: *mut u8,
    // offset of start of font
    fontstart: isize,
    // number of glyphs, needed for range checking
-   numGlyphs: isize,
+   num_glyphs: isize,
 
    // table locations as offset from start of .ttf
    loca: isize,
@@ -447,19 +440,19 @@ pub struct stbtt_fontinfo {
    // a cmap mapping for our chosen character encoding
    index_map: isize,
    // format needed to map from glyph index to glyph
-   indexToLocFormat: isize,
+   index_to_loc_format: isize,
 }
 
-impl stbtt_fontinfo {
-    pub fn uninitialized() -> stbtt_fontinfo {
-        stbtt_fontinfo{
+impl FontInfo {
+    pub fn uninitialized() -> FontInfo {
+        FontInfo{
             userdata: null(),
            // pointer to .ttf file
            data: null_mut(),
            // offset of start of font
            fontstart: 0,
            // number of glyphs, needed for range checking
-           numGlyphs: 0,
+           num_glyphs: 0,
 
            // table locations as offset from start of .ttf
            loca: 0,
@@ -471,7 +464,7 @@ impl stbtt_fontinfo {
            // a cmap mapping for our chosen character encoding
            index_map: 0,
            // format needed to map from glyph index to glyph
-           indexToLocFormat: 0,
+           index_to_loc_format: 0,
         }
     }
 }
@@ -492,25 +485,25 @@ impl stbtt_fontinfo {
 //
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub enum STBTT_cmd {
-  vmove=1,
-  vline=2,
-  vcurve=3
+pub enum Cmd {
+  Move=1,
+  Line=2,
+  Curve=3
 }
 
-type stbtt_vertex_type = i16;
+type VertexType = i16;
 #[derive(Copy, Clone)]
-pub struct stbtt_vertex {
+pub struct Vertex {
    x: i16,
    y: i16,
    cx: i16,
    cy: i16,
-   type_: STBTT_cmd,
+   type_: Cmd,
    flags: u8,
 }
 
 // @TODO: don't expose this structure
-pub struct stbtt__bitmap
+pub struct Bitmap
 {
     w: isize,
     h: isize,
@@ -539,66 +532,71 @@ pub struct stbtt__bitmap
 //             from the file yourself and do your own comparisons on them.
 //             You have to have called stbtt_InitFont() first.
 
-const STBTT_MACSTYLE_DONTCARE: u8 = 0;
-const STBTT_MACSTYLE_BOLD: u8 = 1;
-const STBTT_MACSTYLE_ITALIC: u8 = 2;
-const STBTT_MACSTYLE_UNDERSCORE: u8 = 4;
-const STBTT_MACSTYLE_NONE: u8 = 8;   // <= not same as 0, this makes us check the bitfield is 0
+// const STBTT_MACSTYLE_DONTCARE: u8 = 0;
+// const STBTT_MACSTYLE_BOLD: u8 = 1;
+// const STBTT_MACSTYLE_ITALIC: u8 = 2;
+// const STBTT_MACSTYLE_UNDERSCORE: u8 = 4;
+// const STBTT_MACSTYLE_NONE: u8 = 8;   // <= not same as 0, this makes us check the bitfield is 0
 
-enum STBTT_PLATFORM_ID { // platformID
-   UNICODE   =0,
-   MAC       =1,
-   ISO       =2,
-   MICROSOFT =3
+enum PlatformId { // platform_id
+   Unicode   =0,
+   Mac       =1,
+   Iso       =2,
+   Microsoft =3
 }
 
-impl From<u16> for STBTT_PLATFORM_ID {
-    fn from(val: u16) -> STBTT_PLATFORM_ID {
+impl From<u16> for PlatformId {
+    fn from(val: u16) -> PlatformId {
         match val {
-            0 => STBTT_PLATFORM_ID::UNICODE,
-            1 => STBTT_PLATFORM_ID::MAC,
-            2 => STBTT_PLATFORM_ID::ISO,
-            3 => STBTT_PLATFORM_ID::MICROSOFT,
+            0 => PlatformId::Unicode,
+            1 => PlatformId::Mac,
+            2 => PlatformId::Iso,
+            3 => PlatformId::Microsoft,
             _ => panic!("Unknown STBTT_PLATFORM_ID")
         }
     }
 }
 
-enum STBTT_UNICODE_EID { // encodingID for STBTT_PLATFORM_ID_UNICODE
+/*
+enum STBTT_UNICODE_EID { // encoding_id for STBTT_PLATFORM_ID_UNICODE
    UNICODE_1_0    =0,
    UNICODE_1_1    =1,
    ISO_10646      =2,
    UNICODE_2_0_BMP=3,
    UNICODE_2_0_FULL=4
 }
+*/
 
-enum STBTT_MS_EID { // encodingID for STBTT_PLATFORM_ID_MICROSOFT
-   SYMBOL        =0,
-   UNICODE_BMP   =1,
-   SHIFTJIS      =2,
-   UNICODE_FULL  =10
+enum MsEid { // encoding_id for STBTT_PLATFORM_ID_MICROSOFT
+   Symbol        =0,
+   UnicodeBmp    =1,
+   ShiftJIS      =2,
+   UnicodeFull   =10
 }
 
-impl From<u16> for STBTT_MS_EID {
-    fn from(val: u16) -> STBTT_MS_EID {
+impl From<u16> for MsEid {
+    fn from(val: u16) -> MsEid {
         match val {
-            0 => STBTT_MS_EID::SYMBOL,
-            1 => STBTT_MS_EID::UNICODE_BMP,
-            2 => STBTT_MS_EID::SHIFTJIS,
-            10 => STBTT_MS_EID::UNICODE_FULL,
+            0 => MsEid::Symbol,
+            1 => MsEid::UnicodeBmp,
+            2 => MsEid::ShiftJIS,
+            10 => MsEid::UnicodeFull,
             _ => panic!("Unknown STBTT_MS_EID")
         }
     }
 }
 
-enum STBTT_MAC_EID { // encodingID for STBTT_PLATFORM_ID_MAC; same as Script Manager codes
+/*
+enum STBTT_MAC_EID { // encoding_id for STBTT_PLATFORM_ID_MAC; same as Script Manager codes
    ROMAN        =0,   ARABIC       =4,
    JAPANESE     =1,   HEBREW       =5,
    CHINESE_TRAD =2,   GREEK        =6,
    KOREAN       =3,   RUSSIAN      =7
 }
+*/
 
-enum STBTT_MS_LANG { // languageID for STBTT_PLATFORM_ID_MICROSOFT; same as LCID...
+/*
+enum STBTT_MS_LANG { // language_id for STBTT_PLATFORM_ID_MICROSOFT; same as LCID...
        // problematic because there are e.g. 16 english LCIDs and 16 arabic LCIDs
    ENGLISH     =0x0409,   ITALIAN     =0x0410,
    CHINESE     =0x0804,   JAPANESE    =0x0411,
@@ -607,8 +605,10 @@ enum STBTT_MS_LANG { // languageID for STBTT_PLATFORM_ID_MICROSOFT; same as LCID
    GERMAN      =0x0407,   // TODO: Duplicate, SPANISH     =0x0409,
    HEBREW      =0x040d,   SWEDISH     =0x041D
 }
+*/
 
-enum STBTT_MAC_LANG { // languageID for STBTT_PLATFORM_ID_MAC
+/*
+enum STBTT_MAC_LANG { // language_id for STBTT_PLATFORM_ID_MAC
    ENGLISH      =0 ,   JAPANESE     =11,
    ARABIC       =12,   KOREAN       =23,
    DUTCH        =4 ,   RUSSIAN      =32,
@@ -617,6 +617,7 @@ enum STBTT_MAC_LANG { // languageID for STBTT_PLATFORM_ID_MAC
    HEBREW       =10,   CHINESE_SIMPLIFIED =33,
    ITALIAN      =3 ,   LANG_CHINESE_TRAD =19
 }
+*/
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -628,7 +629,7 @@ enum STBTT_MAC_LANG { // languageID for STBTT_PLATFORM_ID_MAC
 // Can not be > 255.
 const STBTT_MAX_OVERSAMPLE: usize = 8;
 
-const STBTT_RASTERIZER_VERSION: u8 = 2;
+// const STBTT_RASTERIZER_VERSION: u8 = 2;
 
 //////////////////////////////////////////////////////////////////////////
 //
@@ -640,7 +641,7 @@ const STBTT_RASTERIZER_VERSION: u8 = 2;
 
 macro_rules! ttBYTE {
     ($p:expr) => {
-        *($p as *const stbtt_uint8)
+        *($p as *const u8)
     }
 }
 
@@ -648,7 +649,7 @@ macro_rules! ttBYTE {
 
 macro_rules! ttCHAR {
     ($p:expr) => {
-        *($p as *const stbtt_int8)
+        *($p as *const i8)
     }
 }
 
@@ -684,7 +685,7 @@ macro_rules! ttLONG {
 
 macro_rules! stbtt_tag4 {
     ($p:expr, $c0:expr, $c1:expr, $c2:expr, $c3:expr) => {
-        (*$p.offset(0) == ($c0) && *$p.offset(1) == ($c1) && *$p.offset(2) == ($c2) && *$p.offset(3) == ($c3))
+        *$p.offset(0) == ($c0) && *$p.offset(1) == ($c1) && *$p.offset(2) == ($c2) && *$p.offset(3) == ($c3)
     }
 }
 
@@ -698,27 +699,26 @@ macro_rules! stbtt_tag {
 
 // #define stbtt_tag(p,str)           stbtt_tag4(p,str[0],str[1],str[2],str[3])
 
-pub unsafe fn stbtt__isfont(font: *const stbtt_uint8) -> isize {
+pub unsafe fn isfont(font: *const u8) -> isize {
    // check the version number
-   if (stbtt_tag4!(font, '1' as u8,0,0,0)) { return 1; } // TrueType 1
-   if (stbtt_tag!(font, "typ1".as_ptr()))  { return 1; } // TrueType with type 1 font -- we don't support this!
-   if (stbtt_tag!(font, "OTTO".as_ptr()))  { return 1; } // OpenType with CFF
-   if (stbtt_tag4!(font, 0,1,0,0)) { return 1; } // OpenType 1.0
+   if stbtt_tag4!(font, '1' as u8,0,0,0) { return 1; } // TrueType 1
+   if stbtt_tag!(font, "typ1".as_ptr())  { return 1; } // TrueType with type 1 font -- we don't support this!
+   if stbtt_tag!(font, "OTTO".as_ptr())  { return 1; } // OpenType with CFF
+   if stbtt_tag4!(font, 0,1,0,0) { return 1; } // OpenType 1.0
    return 0;
 }
 
 // @OPTIMIZE: binary search
-pub unsafe fn stbtt__find_table(
-    data: *const stbtt_uint8,
-    fontstart: stbtt_uint32,
+pub unsafe fn find_table(
+    data: *const u8,
+    fontstart: u32,
     tag: *const c_char
-) -> stbtt_uint32 {
-   let num_tables: stbtt_int32 = ttUSHORT!(data.offset(fontstart as isize +4)) as i32;
-   let tabledir: stbtt_uint32 = fontstart + 12;
-   let i: stbtt_int32;
+) -> u32 {
+   let num_tables: i32 = ttUSHORT!(data.offset(fontstart as isize +4)) as i32;
+   let tabledir: u32 = fontstart + 12;
    for i in 0..num_tables {
-      let loc: stbtt_uint32 = tabledir + 16*i as u32;
-      if (stbtt_tag!(data.offset(loc as isize +0), tag as *const u8)) {
+      let loc: u32 = tabledir + 16*i as u32;
+      if stbtt_tag!(data.offset(loc as isize +0), tag as *const u8) {
          return ttULONG!(data.offset(loc as isize +8));
       }
    }
@@ -731,22 +731,22 @@ pub unsafe fn stbtt__find_table(
 // file will only define one font and it always be at offset 0, so it will
 // return '0' for index 0, and -1 for all other indices. You can just skip
 // this step if you know it's that kind of font.
-pub unsafe fn stbtt_GetFontOffsetForIndex(
+pub unsafe fn get_font_offset_for_index(
     font_collection: *const u8,
     index: isize
-) -> stbtt_int32 {
+) -> i32 {
    // if it's just a font, there's only one valid index
-   if stbtt__isfont(font_collection) != 0 {
+   if isfont(font_collection) != 0 {
       return if index == 0 { 0 } else { -1 };
    }
 
    // check if it's a TTC
-   if (stbtt_tag!(font_collection, "ttcf".as_ptr())) {
+   if stbtt_tag!(font_collection, "ttcf".as_ptr()) {
       // version 1?
-      if (ttULONG!(font_collection.offset(4)) == 0x00010000
-       || ttULONG!(font_collection.offset(4)) == 0x00020000) {
-         let n: stbtt_int32 = ttLONG!(font_collection.offset(8));
-         if (index >= n as isize) {
+      if ttULONG!(font_collection.offset(4)) == 0x00010000
+       || ttULONG!(font_collection.offset(4)) == 0x00020000 {
+         let n: i32 = ttLONG!(font_collection.offset(8));
+         if index >= n as isize {
             return -1;
          }
          return ttULONG!(font_collection.offset(12+index*4)) as i32;
@@ -757,69 +757,68 @@ pub unsafe fn stbtt_GetFontOffsetForIndex(
 
 // Given an offset into the file that defines a font, this function builds
 // the necessary cached info for the rest of the system. You must allocate
-// the stbtt_fontinfo yourself, and stbtt_InitFont will fill it out. You don't
+// the FontInfo yourself, and stbtt_InitFont will fill it out. You don't
 // need to do anything special to free it, because the contents are pure
 // value data with no additional data structures. Returns 0 on failure.
-pub unsafe fn stbtt_InitFont(
-    info: *mut stbtt_fontinfo,
+pub unsafe fn init_font(
+    info: *mut FontInfo,
     data2: *mut u8,
     fontstart: isize
 ) -> isize {
-   let data: *mut stbtt_uint8 = data2;
-   let cmap: stbtt_uint32;
-   let t: stbtt_uint32;
-   let i: stbtt_int32;
-   let numTables: stbtt_int32;
+   let data: *mut u8 = data2;
+   let cmap: u32;
+   let t: u32;
+   let num_tables: i32;
 
    (*info).data = data;
    (*info).fontstart = fontstart;
 
-   cmap = stbtt__find_table(data, fontstart as u32,
+   cmap = find_table(data, fontstart as u32,
        "cmap".as_ptr() as *const c_char) as u32;       // required
-   (*info).loca = stbtt__find_table(data, fontstart as u32,
+   (*info).loca = find_table(data, fontstart as u32,
        "loca".as_ptr() as *const c_char) as isize; // required
-   (*info).head = stbtt__find_table(data, fontstart as u32,
+   (*info).head = find_table(data, fontstart as u32,
        "head".as_ptr() as *const c_char) as isize; // required
-   (*info).glyf = stbtt__find_table(data, fontstart as u32,
+   (*info).glyf = find_table(data, fontstart as u32,
        "glyf".as_ptr() as *const c_char) as isize; // required
-   (*info).hhea = stbtt__find_table(data, fontstart as u32,
+   (*info).hhea = find_table(data, fontstart as u32,
        "hhea".as_ptr() as *const c_char) as isize; // required
-   (*info).hmtx = stbtt__find_table(data, fontstart as u32,
+   (*info).hmtx = find_table(data, fontstart as u32,
        "hmtx".as_ptr() as *const c_char) as isize; // required
-   (*info).kern = stbtt__find_table(data, fontstart as u32,
+   (*info).kern = find_table(data, fontstart as u32,
        "kern".as_ptr() as *const c_char) as isize; // not required
-   if (cmap == 0
+   if cmap == 0
     || (*info).loca == 0
     || (*info).head == 0
     || (*info).glyf == 0
     || (*info).hhea == 0
-    || (*info).hmtx == 0) {
+    || (*info).hmtx == 0 {
       return 0;
    }
 
-   t = stbtt__find_table(data, fontstart as u32,
+   t = find_table(data, fontstart as u32,
        "maxp".as_ptr() as *const c_char);
    if t != 0 {
-      (*info).numGlyphs = ttUSHORT!(data.offset(t as isize +4)) as isize;
+      (*info).num_glyphs = ttUSHORT!(data.offset(t as isize +4)) as isize;
    } else {
-      (*info).numGlyphs = 0xffff;
+      (*info).num_glyphs = 0xffff;
    }
 
    // find a cmap encoding table we understand *now* to avoid searching
    // later. (todo: could make this installable)
    // the same regardless of glyph.
-   numTables = ttUSHORT!(data.offset(cmap as isize + 2)) as i32;
+   num_tables = ttUSHORT!(data.offset(cmap as isize + 2)) as i32;
    (*info).index_map = 0;
-   for i in 0..numTables {
-      let encoding_record: stbtt_uint32 = cmap + 4 + 8 * i as u32;
+   for i in 0..num_tables {
+      let encoding_record: u32 = cmap + 4 + 8 * i as u32;
       // find an encoding we understand:
-      let val: STBTT_PLATFORM_ID = ttUSHORT!(data.offset(encoding_record as isize)).into();
+      let val: PlatformId = ttUSHORT!(data.offset(encoding_record as isize)).into();
       match val {
-         STBTT_PLATFORM_ID::MICROSOFT => {
-             let val: STBTT_MS_EID = ttUSHORT!(data.offset(encoding_record as isize +2)).into();
+         PlatformId::Microsoft => {
+             let val: MsEid = ttUSHORT!(data.offset(encoding_record as isize +2)).into();
             match val {
-               STBTT_MS_EID::UNICODE_BMP
-               | STBTT_MS_EID::UNICODE_FULL => {
+               MsEid::UnicodeBmp
+               | MsEid::UnicodeFull => {
                   // MS/Unicode
                   (*info).index_map = cmap as isize + ttULONG!(data.offset(encoding_record as isize +4)) as isize;
                }
@@ -828,7 +827,7 @@ pub unsafe fn stbtt_InitFont(
                }
             }
         }
-        STBTT_PLATFORM_ID::UNICODE => {
+        PlatformId::Unicode => {
             // Mac/iOS has these
             // all the encodingIDs are unicode, so we don't bother to check it
             (*info).index_map = cmap as isize + ttULONG!(data.offset(encoding_record as isize +4)) as isize;
@@ -838,11 +837,11 @@ pub unsafe fn stbtt_InitFont(
         }
       }
    }
-   if ((*info).index_map == 0) {
+   if (*info).index_map == 0 {
       return 0;
    }
 
-   (*info).indexToLocFormat = ttUSHORT!(data.offset((*info).head + 50)) as isize;
+   (*info).index_to_loc_format = ttUSHORT!(data.offset((*info).head + 50)) as isize;
    return 1;
 }
 
@@ -850,41 +849,41 @@ pub unsafe fn stbtt_InitFont(
 // and you want a speed-up, call this function with the character you're
 // going to process, then use glyph-based functions instead of the
 // codepoint-based functions.
-pub unsafe fn stbtt_FindGlyphIndex(
-    info: *const stbtt_fontinfo,
+pub unsafe fn find_glyph_index(
+    info: *const FontInfo,
     unicode_codepoint: isize
 ) -> isize {
-   let data: *mut stbtt_uint8 = (*info).data;
-   let index_map: stbtt_uint32 = (*info).index_map as u32;
+   let data: *mut u8 = (*info).data;
+   let index_map: u32 = (*info).index_map as u32;
 
-   let format: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize + 0));
-   if (format == 0) { // apple byte encoding
-      let bytes: stbtt_int32 = ttUSHORT!(data.offset(index_map as isize + 2)) as i32;
-      if (unicode_codepoint < bytes as isize -6) {
+   let format: u16 = ttUSHORT!(data.offset(index_map as isize + 0));
+   if format == 0 { // apple byte encoding
+      let bytes: i32 = ttUSHORT!(data.offset(index_map as isize + 2)) as i32;
+      if unicode_codepoint < bytes as isize -6 {
          return ttBYTE!(data.offset(index_map as isize + 6 + unicode_codepoint as isize)) as isize;
       }
       return 0;
-   } else if (format == 6) {
-      let first: stbtt_uint32 = ttUSHORT!(data.offset(index_map as isize + 6)) as u32;
-      let count: stbtt_uint32 = ttUSHORT!(data.offset(index_map as isize + 8)) as u32;
-      if (unicode_codepoint as stbtt_uint32) >= first
-      && (unicode_codepoint as stbtt_uint32) < first+count {
+   } else if format == 6 {
+      let first: u32 = ttUSHORT!(data.offset(index_map as isize + 6)) as u32;
+      let count: u32 = ttUSHORT!(data.offset(index_map as isize + 8)) as u32;
+      if (unicode_codepoint as u32) >= first
+      && (unicode_codepoint as u32) < first+count {
          return ttUSHORT!(data.offset(
              index_map as isize + 10 + (unicode_codepoint - first as isize)*2)) as isize;
       }
       return 0;
-   } else if (format == 2) {
+   } else if format == 2 {
       STBTT_assert!(false); // @TODO: high-byte mapping for japanese/chinese/korean
       return 0;
-   } else if (format == 4) { // standard mapping for windows fonts: binary search collection of ranges
-      let segcount: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +6)) >> 1;
-      let mut searchRange: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
-      let mut entrySelector: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +10));
-      let rangeShift: stbtt_uint16 = ttUSHORT!(data.offset(index_map as isize +12)) >> 1;
+   } else if format == 4 { // standard mapping for windows fonts: binary search collection of ranges
+      let segcount: u16 = ttUSHORT!(data.offset(index_map as isize +6)) >> 1;
+      let mut search_range: u16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
+      let mut entry_selector: u16 = ttUSHORT!(data.offset(index_map as isize +10));
+      let range_shift: u16 = ttUSHORT!(data.offset(index_map as isize +12)) >> 1;
 
       // do a binary search of the segments
-      let endCount: stbtt_uint32 = index_map + 14;
-      let mut search: stbtt_uint32 = endCount;
+      let end_count: u32 = index_map + 14;
+      let mut search: u32 = end_count;
 
       if unicode_codepoint > 0xffff {
          return 0;
@@ -893,30 +892,30 @@ pub unsafe fn stbtt_FindGlyphIndex(
       // they lie from endCount .. endCount + segCount
       // but searchRange is the nearest power of two, so...
       if unicode_codepoint >= ttUSHORT!(data.offset(
-          search as isize + rangeShift as isize *2)) as isize {
-         search += rangeShift as u32 *2;
+          search as isize + range_shift as isize *2)) as isize {
+         search += range_shift as u32 *2;
       }
 
       // now decrement to bias correctly to find smallest
       search -= 2;
-      while entrySelector != 0 {
-         let end: stbtt_uint16;
-         searchRange >>= 1;
-         end = ttUSHORT!(data.offset(search as isize + searchRange as isize *2));
+      while entry_selector != 0 {
+         let end: u16;
+         search_range >>= 1;
+         end = ttUSHORT!(data.offset(search as isize + search_range as isize *2));
          if unicode_codepoint > end as isize {
-            search += searchRange as u32 *2;
+            search += search_range as u32 *2;
          }
-         entrySelector -= 1;
+         entry_selector -= 1;
       }
       search += 2;
 
       {
-         let offset: stbtt_uint16;
-         let start: stbtt_uint16;
-         let item: stbtt_uint16 = ((search - endCount) >> 1) as stbtt_uint16;
+         let offset: u16;
+         let start: u16;
+         let item: u16 = ((search - end_count) >> 1) as u16;
 
          STBTT_assert!(unicode_codepoint <= ttUSHORT!(data.offset(
-             endCount as isize + 2*item as isize)) as isize);
+             end_count as isize + 2*item as isize)) as isize);
          start = ttUSHORT!(data.offset(index_map as isize + 14 +
              segcount as isize *2 + 2 + 2*item as isize));
          if unicode_codepoint < start as isize {
@@ -925,7 +924,7 @@ pub unsafe fn stbtt_FindGlyphIndex(
 
          offset = ttUSHORT!(data.offset(index_map as isize + 14 +
              segcount as isize *6 + 2 + 2*item as isize));
-         if (offset == 0) {
+         if offset == 0 {
             return (unicode_codepoint + ttSHORT!(data.offset(
                 index_map as isize + 14 + segcount as isize *4 + 2 + 2*item as isize)) as isize)
                 as isize;
@@ -935,24 +934,24 @@ pub unsafe fn stbtt_FindGlyphIndex(
              (unicode_codepoint-start as isize)*2 +
              index_map as isize + 14 + segcount as isize *6 + 2 + 2*item as isize)) as isize;
       }
-   } else if (format == 12 || format == 13) {
-      let ngroups: stbtt_uint32 = ttULONG!(data.offset(index_map as isize +12));
-      let mut low: stbtt_int32;
-      let mut high: stbtt_int32;
-      low = 0; high = ngroups as stbtt_int32;
+   } else if format == 12 || format == 13 {
+      let ngroups: u32 = ttULONG!(data.offset(index_map as isize +12));
+      let mut low: i32;
+      let mut high: i32;
+      low = 0; high = ngroups as i32;
       // Binary search the right group.
-      while (low < high) {
-         let mid: stbtt_int32 = low + ((high-low) >> 1); // rounds down, so low <= mid < high
-         let start_char: stbtt_uint32 = ttULONG!(data.offset(index_map as isize +16+mid as isize *12));
-         let end_char: stbtt_uint32 = ttULONG!(data.offset(index_map as isize +16+mid as isize*12+4));
-         if (unicode_codepoint as stbtt_uint32) < start_char {
+      while low < high {
+         let mid: i32 = low + ((high-low) >> 1); // rounds down, so low <= mid < high
+         let start_char: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize *12));
+         let end_char: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize*12+4));
+         if (unicode_codepoint as u32) < start_char {
             high = mid;
          }
-         else if (unicode_codepoint as stbtt_uint32) > end_char {
+         else if (unicode_codepoint as u32) > end_char {
             low = mid+1;
          }
          else {
-            let start_glyph: stbtt_uint32 = ttULONG!(data.offset(index_map as isize +16+mid as isize *12+8));
+            let start_glyph: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize *12+8));
             if format == 12 {
                return start_glyph as isize + unicode_codepoint-start_char as isize;
             }
@@ -968,40 +967,40 @@ pub unsafe fn stbtt_FindGlyphIndex(
    return 0;
 }
 
-pub unsafe fn stbtt_GetCodepointShape(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_codepoint_shape(
+    info: *const FontInfo,
     unicode_codepoint: isize,
-     vertices: *mut *mut stbtt_vertex
+     vertices: *mut *mut Vertex
 ) -> isize {
-   return stbtt_GetGlyphShape(info, stbtt_FindGlyphIndex(info, unicode_codepoint), vertices);
+   return get_glyph_shape(info, find_glyph_index(info, unicode_codepoint), vertices);
 }
 
 pub unsafe fn stbtt_setvertex(
-    v: *mut stbtt_vertex,
-    type_: STBTT_cmd,
-    x: stbtt_int32,
-    y: stbtt_int32,
-    cx: stbtt_int32,
-    cy: stbtt_int32
+    v: *mut Vertex,
+    type_: Cmd,
+    x: i32,
+    y: i32,
+    cx: i32,
+    cy: i32
 ) {
    (*v).type_ = type_;
-   (*v).x = x as stbtt_int16;
-   (*v).y = y as stbtt_int16;
-   (*v).cx = cx as stbtt_int16;
-   (*v).cy = cy as stbtt_int16;
+   (*v).x = x as i16;
+   (*v).y = y as i16;
+   (*v).cx = cx as i16;
+   (*v).cy = cy as i16;
 }
 
-pub unsafe fn stbtt__GetGlyfOffset(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_offset(
+    info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
    let g1: isize;
    let g2: isize;
 
-   if glyph_index >= (*info).numGlyphs { return -1; } // glyph index out of range
-   if (*info).indexToLocFormat >= 2   { return -1; } // unknown index->glyph map format
+   if glyph_index >= (*info).num_glyphs { return -1; } // glyph index out of range
+   if (*info).index_to_loc_format >= 2   { return -1; } // unknown index->glyph map format
 
-   if (*info).indexToLocFormat == 0 {
+   if (*info).index_to_loc_format == 0 {
       g1 = (*info).glyf + ttUSHORT!((*info).data.offset((*info).loca + glyph_index * 2)) as isize * 2;
       g2 = (*info).glyf + ttUSHORT!((*info).data.offset((*info).loca + glyph_index * 2 + 2)) as isize * 2;
    } else {
@@ -1013,16 +1012,16 @@ pub unsafe fn stbtt__GetGlyfOffset(
 }
 
 // as above, but takes one or more glyph indices for greater efficiency
-pub unsafe fn stbtt_GetGlyphBox(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_box(
+    info: *const FontInfo,
     glyph_index: isize,
     x0: *mut isize,
     y0: *mut isize,
     x1: *mut isize,
     y1: *mut isize
 ) -> isize {
-   let g: isize = stbtt__GetGlyfOffset(info, glyph_index);
-   if (g < 0) { return 0; }
+   let g: isize = get_glyph_offset(info, glyph_index);
+   if g < 0 { return 0; }
 
    if x0 != null_mut() { *x0 = ttSHORT!((*info).data.offset(g + 2)) as isize; }
    if y0 != null_mut() { *y0 = ttSHORT!((*info).data.offset(g + 4)) as isize; }
@@ -1032,55 +1031,55 @@ pub unsafe fn stbtt_GetGlyphBox(
 }
 
 // Gets the bounding box of the visible part of the glyph, in unscaled coordinates
-pub unsafe fn stbtt_GetCodepointBox(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_codepoint_box(
+    info: *const FontInfo,
     codepoint: isize,
     x0: *mut isize,
     y0: *mut isize,
     x1: *mut isize,
     y1: *mut isize
 ) -> isize {
-   return stbtt_GetGlyphBox(info, stbtt_FindGlyphIndex(info,codepoint), x0,y0,x1,y1);
+   return get_glyph_box(info, find_glyph_index(info,codepoint), x0,y0,x1,y1);
 }
 
 // returns non-zero if nothing is drawn for this glyph
-pub unsafe fn stbtt_IsGlyphEmpty(
-    info: *const stbtt_fontinfo,
+pub unsafe fn is_glyph_empty(
+    info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
-   let numberOfContours: stbtt_int16;
-   let g: isize = stbtt__GetGlyfOffset(info, glyph_index);
+   let number_of_contours: i16;
+   let g: isize = get_glyph_offset(info, glyph_index);
    if g < 0 { return 1; }
-   numberOfContours = ttSHORT!((*info).data.offset(g));
-   return if numberOfContours == 0 { 0 } else { 1 };
+   number_of_contours = ttSHORT!((*info).data.offset(g));
+   return if number_of_contours == 0 { 0 } else { 1 };
 }
 
-pub unsafe fn stbtt__close_shape(
-    vertices: *mut stbtt_vertex,
+pub unsafe fn close_shape(
+    vertices: *mut Vertex,
     mut num_vertices: isize,
     was_off: isize,
     start_off: isize,
-    sx: stbtt_int32,
-    sy: stbtt_int32,
-    scx: stbtt_int32,
-    scy: stbtt_int32,
-    cx: stbtt_int32,
-    cy: stbtt_int32
+    sx: i32,
+    sy: i32,
+    scx: i32,
+    scy: i32,
+    cx: i32,
+    cy: i32
 ) -> isize {
    if start_off != 0 {
       if was_off != 0 {
          stbtt_setvertex(vertices.offset(num_vertices),
-             STBTT_cmd::vcurve, (cx+scx)>>1, (cy+scy)>>1, cx,cy);
+             Cmd::Curve, (cx+scx)>>1, (cy+scy)>>1, cx,cy);
          num_vertices += 1;
       }
-      stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vcurve, sx,sy,scx,scy);
+      stbtt_setvertex(vertices.offset(num_vertices), Cmd::Curve, sx,sy,scx,scy);
       num_vertices += 1;
    } else {
       if was_off != 0 {
-         stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vcurve,sx,sy,cx,cy);
+         stbtt_setvertex(vertices.offset(num_vertices), Cmd::Curve,sx,sy,cx,cy);
          num_vertices += 1;
       } else {
-         stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vline,sx,sy,0,0);
+         stbtt_setvertex(vertices.offset(num_vertices), Cmd::Line,sx,sy,0,0);
          num_vertices += 1;
       }
    }
@@ -1096,53 +1095,52 @@ pub unsafe fn stbtt__close_shape(
 // draws a line from previous endpoint to its x,y; a curveto
 // draws a quadratic bezier from previous endpoint to
 // its x,y, using cx,cy as the bezier control point.
-pub unsafe fn stbtt_GetGlyphShape(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_shape(
+    info: *const FontInfo,
     glyph_index: isize,
-    pvertices: *mut *mut stbtt_vertex
+    pvertices: *mut *mut Vertex
 ) -> isize {
-   let numberOfContours: stbtt_int16;
-   let endPtsOfContours: *mut stbtt_uint8;
-   let data: *mut stbtt_uint8 = (*info).data;
-   let mut vertices: *mut stbtt_vertex=null_mut();
+   let number_of_contours: i16;
+   let end_pts_of_contours: *mut u8;
+   let data: *mut u8 = (*info).data;
+   let mut vertices: *mut Vertex=null_mut();
    let mut num_vertices: isize =0;
-   let g: isize = stbtt__GetGlyfOffset(info, glyph_index);
+   let g: isize = get_glyph_offset(info, glyph_index);
 
    *pvertices = null_mut();
 
    if g < 0 { return 0; }
 
-   numberOfContours = ttSHORT!(data.offset(g));
+   number_of_contours = ttSHORT!(data.offset(g));
 
-   if numberOfContours > 0 {
-      let mut flags: stbtt_uint8 =0;
-      let mut flagcount: stbtt_uint8;
-      let ins: stbtt_int32;
-      let i: stbtt_int32;
-      let mut j: stbtt_int32 =0;
-      let m: stbtt_int32;
-      let n: stbtt_int32;
-      let mut next_move: stbtt_int32;
-      let mut was_off: stbtt_int32 =0;
-      let off: stbtt_int32;
-      let mut start_off: stbtt_int32 =0;
-      let mut x: stbtt_int32;
-      let mut y: stbtt_int32;
-      let mut cx: stbtt_int32;
-      let mut cy: stbtt_int32;
-      let mut sx: stbtt_int32;
-      let mut sy: stbtt_int32;
-      let mut scx: stbtt_int32;
-      let mut scy: stbtt_int32;
-      let mut points: *mut stbtt_uint8;
-      endPtsOfContours = data.offset(g + 10);
-      ins = ttUSHORT!(data.offset(g + 10 + numberOfContours as isize * 2)) as i32;
-      points = data.offset(g + 10 + numberOfContours as isize * 2 + 2 + ins as isize);
+   if number_of_contours > 0 {
+      let mut flags: u8 =0;
+      let mut flagcount: u8;
+      let ins: i32;
+      let mut j: i32 =0;
+      let m: i32;
+      let n: i32;
+      let mut next_move: i32;
+      let mut was_off: i32 =0;
+      let off: i32;
+      let mut start_off: i32 =0;
+      let mut x: i32;
+      let mut y: i32;
+      let mut cx: i32;
+      let mut cy: i32;
+      let mut sx: i32;
+      let mut sy: i32;
+      let mut scx: i32;
+      let mut scy: i32;
+      let mut points: *mut u8;
+      end_pts_of_contours = data.offset(g + 10);
+      ins = ttUSHORT!(data.offset(g + 10 + number_of_contours as isize * 2)) as i32;
+      points = data.offset(g + 10 + number_of_contours as isize * 2 + 2 + ins as isize);
 
-      n = 1+ttUSHORT!(endPtsOfContours.offset(numberOfContours as isize *2-2)) as i32;
+      n = 1+ttUSHORT!(end_pts_of_contours.offset(number_of_contours as isize *2-2)) as i32;
 
-      m = n + 2*numberOfContours as i32;  // a loose bound on how many vertices we might need
-      vertices = STBTT_malloc!(m as usize * size_of::<stbtt_vertex>()) as *mut stbtt_vertex;
+      m = n + 2*number_of_contours as i32;  // a loose bound on how many vertices we might need
+      vertices = STBTT_malloc!(m as usize * size_of::<Vertex>()) as *mut Vertex;
       if vertices == null_mut() {
          return 0;
       }
@@ -1159,7 +1157,7 @@ pub unsafe fn stbtt_GetGlyphShape(
       // first load flags
 
       for i in 0..n {
-         if (flagcount == 0) {
+         if flagcount == 0 {
             flags = *points;
             points = points.offset(1);
             if (flags & 8) != 0 {
@@ -1176,7 +1174,7 @@ pub unsafe fn stbtt_GetGlyphShape(
       for i in 0..n {
          flags = (*vertices.offset(off as isize + i as isize)).flags;
          if (flags & 2) != 0 {
-            let dx: stbtt_int16 = *points as i16;
+            let dx: i16 = *points as i16;
             points = points.offset(1);
             x += if (flags & 16) != 0 { dx as i32 } else { -dx as i32 }; // ???
          } else {
@@ -1185,7 +1183,7 @@ pub unsafe fn stbtt_GetGlyphShape(
                points = points.offset(2);
             }
          }
-         (*vertices.offset(off as isize +i as isize)).x = x as stbtt_int16;
+         (*vertices.offset(off as isize +i as isize)).x = x as i16;
       }
 
       // now load y coordinates
@@ -1193,7 +1191,7 @@ pub unsafe fn stbtt_GetGlyphShape(
       for i in 0..n {
          flags = (*vertices.offset(off as isize + i as isize)).flags;
          if (flags & 4) != 0 {
-            let dy: stbtt_int16 = *points as i16;
+            let dy: i16 = *points as i16;
             points = points.offset(1);
             y += if (flags & 32) != 0 { dy as i32 } else { -dy as i32 }; // ???
          } else {
@@ -1202,7 +1200,7 @@ pub unsafe fn stbtt_GetGlyphShape(
                points = points.offset(2);
             }
          }
-         (*vertices.offset(off as isize +i as isize)).y = y as stbtt_int16;
+         (*vertices.offset(off as isize +i as isize)).y = y as i16;
       }
 
       // now convert them to our format
@@ -1216,9 +1214,9 @@ pub unsafe fn stbtt_GetGlyphShape(
          flags = (*vertices.offset(off as isize +i as isize)).flags;
          x     = (*vertices.offset(off as isize +i as isize)).x as i32;
          y     = (*vertices.offset(off as isize +i as isize)).y as i32;
-         if (next_move == i) {
-            if (i != 0) {
-               num_vertices = stbtt__close_shape(vertices,
+         if next_move == i {
+            if i != 0 {
+               num_vertices = close_shape(vertices,
                    num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
             }
 
@@ -1229,30 +1227,30 @@ pub unsafe fn stbtt_GetGlyphShape(
                // where we can start, and we need to save some state for when we wraparound.
                scx = x;
                scy = y;
-               if (*vertices.offset(off as isize +i as isize +1)).type_ == STBTT_cmd::vline {
+               if (*vertices.offset(off as isize +i as isize +1)).type_ == Cmd::Line {
                   // next point is also a curve point, so interpolate an on-point curve
-                  sx = (x + (*vertices.offset(off as isize +i as isize +1)).x as stbtt_int32) >> 1;
-                  sy = (y + (*vertices.offset(off as isize +i as isize +1)).y as stbtt_int32) >> 1;
+                  sx = (x + (*vertices.offset(off as isize +i as isize +1)).x as i32) >> 1;
+                  sy = (y + (*vertices.offset(off as isize +i as isize +1)).y as i32) >> 1;
                } else {
                   // otherwise just use the next point as our start point
-                  sx = (*vertices.offset(off as isize +i as isize +1)).x as stbtt_int32;
-                  sy = (*vertices.offset(off as isize +i as isize +1)).y as stbtt_int32;
+                  sx = (*vertices.offset(off as isize +i as isize +1)).x as i32;
+                  sy = (*vertices.offset(off as isize +i as isize +1)).y as i32;
                   i_iter.next(); // we're using point i+1 as the starting point, so skip it
                }
             } else {
                sx = x;
                sy = y;
             }
-            stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vmove,sx,sy,0,0);
+            stbtt_setvertex(vertices.offset(num_vertices), Cmd::Move,sx,sy,0,0);
             num_vertices += 1;
             was_off = 0;
-            next_move = 1 + ttUSHORT!(endPtsOfContours.offset(j as isize *2)) as i32;
+            next_move = 1 + ttUSHORT!(end_pts_of_contours.offset(j as isize *2)) as i32;
             j += 1;
          } else {
             if (flags & 1) == 0 { // if it's a curve
                if was_off != 0 { // two off-curve control points in a row means interpolate an on-curve midpoint
                   stbtt_setvertex(vertices.offset(num_vertices),
-                      STBTT_cmd::vcurve, (cx+x)>>1, (cy+y)>>1, cx, cy);
+                      Cmd::Curve, (cx+x)>>1, (cy+y)>>1, cx, cy);
                   num_vertices += 1;
                }
                cx = x;
@@ -1260,30 +1258,29 @@ pub unsafe fn stbtt_GetGlyphShape(
                was_off = 1;
             } else {
                if was_off != 0 {
-                  stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vcurve, x,y, cx, cy);
+                  stbtt_setvertex(vertices.offset(num_vertices), Cmd::Curve, x,y, cx, cy);
                   num_vertices += 1;
                } else {
-                  stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vline, x,y,0,0);
+                  stbtt_setvertex(vertices.offset(num_vertices), Cmd::Line, x,y,0,0);
                   num_vertices += 1;
                }
                was_off = 0;
             }
          }
       }
-      num_vertices = stbtt__close_shape(vertices, num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
-   } else if (numberOfContours == -1) {
+      num_vertices = close_shape(vertices, num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
+   } else if number_of_contours == -1 {
       // Compound shapes.
       let mut more: isize = 1;
-      let mut comp: *const stbtt_uint8 = data.offset(g + 10);
+      let mut comp: *const u8 = data.offset(g + 10);
       num_vertices = 0;
       vertices = null_mut();
       while more != 0 {
-         let flags: stbtt_uint16;
-         let gidx: stbtt_uint16;
-         let mut comp_num_verts: isize = 0;
-         let i: isize;
-         let mut comp_verts: *mut stbtt_vertex = null_mut();
-         let mut tmp: *mut stbtt_vertex = null_mut();
+         let flags: u16;
+         let gidx: u16;
+         let comp_num_verts: isize;
+         let mut comp_verts: *mut Vertex = null_mut();
+         let tmp: *mut Vertex;
          let mut mtx: [f32; 6] = [1.0,0.0,0.0,1.0,0.0,0.0];
          let m: f32;
          let n: f32;
@@ -1327,34 +1324,34 @@ pub unsafe fn stbtt_GetGlyphShape(
          n = STBTT_sqrt!(mtx[2]*mtx[2] + mtx[3]*mtx[3]) as f32;
 
          // Get indexed glyph.
-         comp_num_verts = stbtt_GetGlyphShape(info, gidx as isize, &mut comp_verts);
-         if (comp_num_verts > 0) {
+         comp_num_verts = get_glyph_shape(info, gidx as isize, &mut comp_verts);
+         if comp_num_verts > 0 {
             // Transform vertices.
             for i in 0..comp_num_verts {
-               let v: *mut stbtt_vertex = comp_verts.offset(i);
-               let mut x: stbtt_vertex_type;
-               let mut y: stbtt_vertex_type;
+               let v: *mut Vertex = comp_verts.offset(i);
+               let mut x: VertexType;
+               let mut y: VertexType;
                x=(*v).x; y=(*v).y;
-               (*v).x = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as stbtt_vertex_type;
-               (*v).y = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as stbtt_vertex_type;
+               (*v).x = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as VertexType;
+               (*v).y = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as VertexType;
                x=(*v).cx; y=(*v).cy;
-               (*v).cx = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as stbtt_vertex_type;
-               (*v).cy = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as stbtt_vertex_type;
+               (*v).cx = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as VertexType;
+               (*v).cy = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as VertexType;
             }
             // Append vertices.
-            tmp = STBTT_malloc!((num_vertices+comp_num_verts) as usize *size_of::<stbtt_vertex>())
-                as *mut stbtt_vertex;
+            tmp = STBTT_malloc!((num_vertices+comp_num_verts) as usize *size_of::<Vertex>())
+                as *mut Vertex;
             if tmp == null_mut() {
                if vertices != null_mut() { STBTT_free!(vertices as *mut c_void); }
                if comp_verts != null_mut() { STBTT_free!(comp_verts as *mut c_void); }
                return 0;
             }
-            if (num_vertices > 0) {
+            if num_vertices > 0 {
                 STBTT_memcpy(tmp, vertices,
-                    num_vertices as usize *size_of::<stbtt_vertex>());
+                    num_vertices as usize *size_of::<Vertex>());
             }
             STBTT_memcpy(tmp.offset(num_vertices), comp_verts,
-                comp_num_verts as usize *size_of::<stbtt_vertex>());
+                comp_num_verts as usize *size_of::<Vertex>());
             if vertices != null_mut() { STBTT_free!(vertices as *mut c_void); }
             vertices = tmp;
             STBTT_free!(comp_verts as *mut c_void);
@@ -1363,7 +1360,7 @@ pub unsafe fn stbtt_GetGlyphShape(
          // More components ?
          more = (flags & (1<<5)) as isize;
       }
-   } else if (numberOfContours < 0) {
+   } else if number_of_contours < 0 {
       // @TODO other compound variations?
       STBTT_assert!(false);
    } else {
@@ -1374,39 +1371,39 @@ pub unsafe fn stbtt_GetGlyphShape(
    return num_vertices;
 }
 
-pub unsafe fn stbtt_GetGlyphHMetrics(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_hmetrics(
+    info: *const FontInfo,
     glyph_index: isize,
-    advanceWidth: *mut isize,
-    leftSideBearing: *mut isize
+    advance_width: *mut isize,
+    left_side_bearing: *mut isize
 ) {
-   let numOfLongHorMetrics: stbtt_uint16 = ttUSHORT!((*info).data.offset((*info).hhea + 34));
-   if (glyph_index < numOfLongHorMetrics as isize) {
-      if advanceWidth != null_mut() {
-          *advanceWidth    = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index)) as isize;
+   let num_of_long_hor_metrics: u16 = ttUSHORT!((*info).data.offset((*info).hhea + 34));
+   if glyph_index < num_of_long_hor_metrics as isize {
+      if advance_width != null_mut() {
+          *advance_width    = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index)) as isize;
       }
-      if leftSideBearing != null_mut() {
-          *leftSideBearing = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index + 2)) as isize;
+      if left_side_bearing != null_mut() {
+          *left_side_bearing = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index + 2)) as isize;
       }
    } else {
-      if advanceWidth != null_mut() {
-          *advanceWidth    = ttSHORT!((*info).data.offset((*info).hmtx + 4*(numOfLongHorMetrics as isize -1))) as isize;
+      if advance_width != null_mut() {
+          *advance_width    = ttSHORT!((*info).data.offset((*info).hmtx + 4*(num_of_long_hor_metrics as isize -1))) as isize;
       }
-      if leftSideBearing != null_mut() {
-          *leftSideBearing = ttSHORT!((*info).data.offset(
-              (*info).hmtx + 4*numOfLongHorMetrics as isize + 2*(glyph_index - numOfLongHorMetrics as isize))) as isize;
+      if left_side_bearing != null_mut() {
+          *left_side_bearing = ttSHORT!((*info).data.offset(
+              (*info).hmtx + 4*num_of_long_hor_metrics as isize + 2*(glyph_index - num_of_long_hor_metrics as isize))) as isize;
       }
    }
 }
 
-pub unsafe fn stbtt_GetGlyphKernAdvance(
-    info: *mut stbtt_fontinfo,
+pub unsafe fn get_glyph_kern_advance(
+    info: *mut FontInfo,
     glyph1: isize,
     glyph2: isize
 ) -> isize {
-   let data: *mut stbtt_uint8 = (*info).data.offset((*info).kern);
-   let needle: stbtt_uint32;
-   let mut straw: stbtt_uint32;
+   let data: *mut u8 = (*info).data.offset((*info).kern);
+   let needle: u32;
+   let mut straw: u32;
    let mut l: isize;
    let mut r: isize;
    let mut m: isize;
@@ -1425,7 +1422,7 @@ pub unsafe fn stbtt_GetGlyphKernAdvance(
    l = 0;
    r = ttUSHORT!(data.offset(10)) as isize - 1;
    needle = (glyph1 << 16 | glyph2) as u32;
-   while (l <= r) {
+   while l <= r {
       m = (l + r) >> 1;
       straw = ttULONG!(data.offset(18+(m*6))); // note: unaligned read
       if needle < straw {
@@ -1441,27 +1438,27 @@ pub unsafe fn stbtt_GetGlyphKernAdvance(
 }
 
 // an additional amount to add to the 'advance' value between ch1 and ch2
-pub unsafe fn stbtt_GetCodepointKernAdvance(
-    info: *mut stbtt_fontinfo,
+pub unsafe fn get_codepoint_kern_advance(
+    info: *mut FontInfo,
     ch1: isize,
     ch2: isize
 ) -> isize {
    if (*info).kern == 0 { // if no kerning table, don't waste time looking up both codepoint->glyphs
       return 0;
    }
-   return stbtt_GetGlyphKernAdvance(info, stbtt_FindGlyphIndex(info,ch1), stbtt_FindGlyphIndex(info,ch2));
+   return get_glyph_kern_advance(info, find_glyph_index(info,ch1), find_glyph_index(info,ch2));
 }
 
 // leftSideBearing is the offset from the current horizontal position to the left edge of the character
 // advanceWidth is the offset from the current horizontal position to the next horizontal position
 //   these are expressed in unscaled coordinates
-pub unsafe fn stbtt_GetCodepointHMetrics(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_codepoint_hmetrics(
+    info: *const FontInfo,
     codepoint: isize,
-    advanceWidth: *mut isize,
-    leftSideBearing: *mut isize
+    advance_width: *mut isize,
+    left_side_bearing: *mut isize
 ) {
-   stbtt_GetGlyphHMetrics(info, stbtt_FindGlyphIndex(info,codepoint), advanceWidth, leftSideBearing);
+   get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
 }
 
 // ascent is the coordinate above the baseline the font extends; descent
@@ -1470,11 +1467,11 @@ pub unsafe fn stbtt_GetCodepointHMetrics(
 // so you should advance the vertical position by "*ascent - *descent + *lineGap"
 //   these are expressed in unscaled coordinates, so you must multiply by
 //   the scale factor for a given size
-pub unsafe fn stbtt_GetFontVMetrics(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_font_vmetrics(
+    info: *const FontInfo,
     ascent: *mut isize,
     descent: *mut isize,
-    lineGap: *mut isize
+    line_gap: *mut isize
 ) {
    if ascent != null_mut() {
        *ascent  = ttSHORT!((*info).data.offset((*info).hhea + 4)) as isize;
@@ -1482,14 +1479,14 @@ pub unsafe fn stbtt_GetFontVMetrics(
    if descent != null_mut() {
        *descent = ttSHORT!((*info).data.offset((*info).hhea + 6)) as isize;
    }
-   if lineGap != null_mut() {
-       *lineGap = ttSHORT!((*info).data.offset((*info).hhea + 8)) as isize;
+   if line_gap != null_mut() {
+       *line_gap = ttSHORT!((*info).data.offset((*info).hhea + 8)) as isize;
    }
 }
 
 // the bounding box around all possible characters
-pub unsafe fn stbtt_GetFontBoundingBox(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_font_bounding_box(
+    info: *const FontInfo,
     x0: *mut isize,
     y0: *mut isize,
     x1: *mut isize,
@@ -1507,8 +1504,8 @@ pub unsafe fn stbtt_GetFontBoundingBox(
 // and computing:
 //       scale = pixels / (ascent - descent)
 // so if you prefer to measure height by the ascent only, use a similar calculation.
-pub unsafe fn stbtt_ScaleForPixelHeight(
-    info: *const stbtt_fontinfo,
+pub unsafe fn scale_for_pixel_height(
+    info: *const FontInfo,
     height: f32
 ) -> f32 {
    let fheight = ttSHORT!((*info).data.offset((*info).hhea + 4))
@@ -1519,12 +1516,12 @@ pub unsafe fn stbtt_ScaleForPixelHeight(
 // computes a scale factor to produce a font whose EM size is mapped to
 // 'pixels' tall. This is probably what traditional APIs compute, but
 // I'm not positive.
-pub unsafe fn stbtt_ScaleForMappingEmToPixels(
-    info: *const stbtt_fontinfo,
+pub unsafe fn scale_for_mapping_em_to_pixels(
+    info: *const FontInfo,
     pixels: f32
 ) -> f32 {
-   let unitsPerEm = ttUSHORT!((*info).data.offset((*info).head + 18));
-   return pixels / unitsPerEm as f32;
+   let units_per_em = ttUSHORT!((*info).data.offset((*info).head + 18));
+   return pixels / units_per_em as f32;
 }
 
 // frees the data allocated above
@@ -1533,7 +1530,7 @@ pub unsafe fn stbtt_ScaleForMappingEmToPixels(
 //
 // BITMAP RENDERING
 //
-pub unsafe fn stbtt_FreeShape(info: *const stbtt_fontinfo, v: *mut stbtt_vertex)
+pub unsafe fn free_shape(_info: *const FontInfo, v: *mut Vertex)
 {
    STBTT_free!(v as *mut c_void);
 }
@@ -1543,8 +1540,8 @@ pub unsafe fn stbtt_FreeShape(info: *const stbtt_fontinfo, v: *mut stbtt_vertex)
 // antialiasing software rasterizer
 //
 
-pub unsafe fn stbtt_GetGlyphBitmapBoxSubpixel(
-    font: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_bitmap_box_subpixel(
+    font: *const FontInfo,
     glyph: isize,
     scale_x: f32,
     scale_y: f32,
@@ -1559,7 +1556,7 @@ pub unsafe fn stbtt_GetGlyphBitmapBoxSubpixel(
    let mut y0: isize = 0;
    let mut x1: isize = 0;
    let mut y1: isize = 0;
-   if stbtt_GetGlyphBox(font, glyph, &mut x0,&mut y0,&mut x1,&mut y1) == 0 {
+   if get_glyph_box(font, glyph, &mut x0,&mut y0,&mut x1,&mut y1) == 0 {
       // e.g. space character
       if ix0 != null_mut() { *ix0 = 0; }
       if iy0 != null_mut() { *iy0 = 0; }
@@ -1574,8 +1571,8 @@ pub unsafe fn stbtt_GetGlyphBitmapBoxSubpixel(
    }
 }
 
-pub unsafe fn stbtt_GetGlyphBitmapBox(
-    font: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_bitmap_box(
+    font: *const FontInfo,
     glyph: isize,
     scale_x: f32,
     scale_y: f32,
@@ -1584,13 +1581,13 @@ pub unsafe fn stbtt_GetGlyphBitmapBox(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   stbtt_GetGlyphBitmapBoxSubpixel(font, glyph, scale_x, scale_y,0.0,0.0, ix0, iy0, ix1, iy1);
+   get_glyph_bitmap_box_subpixel(font, glyph, scale_x, scale_y,0.0,0.0, ix0, iy0, ix1, iy1);
 }
 
 // same as stbtt_GetCodepointBitmapBox, but you can specify a subpixel
 // shift for the character
-pub unsafe fn stbtt_GetCodepointBitmapBoxSubpixel(
-    font: *const stbtt_fontinfo,
+pub unsafe fn get_codepoint_bitmap_box_subpixel(
+    font: *const FontInfo,
     codepoint: isize,
     scale_x: f32,
     scale_y: f32,
@@ -1601,7 +1598,7 @@ pub unsafe fn stbtt_GetCodepointBitmapBoxSubpixel(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   stbtt_GetGlyphBitmapBoxSubpixel(font, stbtt_FindGlyphIndex(font,codepoint), scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
+   get_glyph_bitmap_box_subpixel(font, find_glyph_index(font,codepoint), scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
 }
 
 // get the bbox of the bitmap centered around the glyph origin; so the
@@ -1609,8 +1606,8 @@ pub unsafe fn stbtt_GetCodepointBitmapBoxSubpixel(
 // the bitmap top left is (leftSideBearing*scale,iy0).
 // (Note that the bitmap uses y-increases-down, but the shape uses
 // y-increases-up, so CodepointBitmapBox and CodepointBox are inverted.)
-pub unsafe fn stbtt_GetCodepointBitmapBox(
-    font: *const stbtt_fontinfo,
+pub unsafe fn get_codepoint_bitmap_box(
+    font: *const FontInfo,
     codepoint: isize,
     scale_x: f32,
     scale_y: f32,
@@ -1619,43 +1616,43 @@ pub unsafe fn stbtt_GetCodepointBitmapBox(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   stbtt_GetCodepointBitmapBoxSubpixel(font, codepoint, scale_x, scale_y,0.0,0.0, ix0,iy0,ix1,iy1);
+   get_codepoint_bitmap_box_subpixel(font, codepoint, scale_x, scale_y,0.0,0.0, ix0,iy0,ix1,iy1);
 }
 
 //////////////////////////////////////////////////////////////////////////////
 //
 //  Rasterizer
 
-struct stbtt__hheap_chunk {
-   next: *mut stbtt__hheap_chunk
+struct HheapChunk {
+   next: *mut HheapChunk
 }
 
-pub struct stbtt__hheap
+pub struct Hheap
 {
-   head: *mut stbtt__hheap_chunk,
+   head: *mut HheapChunk,
    first_free: *mut (),
    num_remaining_in_head_chunk: isize,
 }
 
-pub unsafe fn stbtt__hheap_alloc(
-    hh: *mut stbtt__hheap,
+pub unsafe fn hheap_alloc(
+    hh: *mut Hheap,
     size: size_t,
-    userdata: *const ()
+    _userdata: *const ()
 ) -> *const () {
    if (*hh).first_free != null_mut() {
       let p: *mut () = (*hh).first_free;
       (*hh).first_free = *(p as *mut *mut ());
       return p;
    } else {
-      if ((*hh).num_remaining_in_head_chunk == 0) {
+      if (*hh).num_remaining_in_head_chunk == 0 {
          let count: isize = if size < 32 {
                 2000
             } else {
                 if size < 128 { 800 } else { 100 }
             };
-         let c: *mut stbtt__hheap_chunk = STBTT_malloc!(
-             size_of::<stbtt__hheap_chunk>() + size * count as usize)
-             as *mut stbtt__hheap_chunk;
+         let c: *mut HheapChunk = STBTT_malloc!(
+             size_of::<HheapChunk>() + size * count as usize)
+             as *mut HheapChunk;
          if c == null_mut() {
             return null();
          }
@@ -1669,22 +1666,22 @@ pub unsafe fn stbtt__hheap_alloc(
    }
 }
 
-pub unsafe fn stbtt__hheap_free(hh: *mut stbtt__hheap, p: *mut ()) {
+pub unsafe fn hheap_free(hh: *mut Hheap, p: *mut ()) {
    *(p as *mut *mut ()) = (*hh).first_free;
    (*hh).first_free = p;
 }
 
-pub unsafe fn stbtt__hheap_cleanup(hh: *mut stbtt__hheap, userdata: *const ()) {
-   let mut c: *mut stbtt__hheap_chunk = (*hh).head;
+pub unsafe fn hheap_cleanup(hh: *mut Hheap, _userdata: *const ()) {
+   let mut c: *mut HheapChunk = (*hh).head;
    while c != null_mut() {
-      let n: *mut stbtt__hheap_chunk = (*c).next;
+      let n: *mut HheapChunk = (*c).next;
       STBTT_free!(c as *mut c_void);
       c = n;
    }
 }
 
 #[derive(Copy, Clone)]
-pub struct stbtt__edge {
+pub struct Edge {
     x0: f32,
     y0: f32,
     x1: f32,
@@ -1692,8 +1689,8 @@ pub struct stbtt__edge {
    invert: isize,
 }
 
-pub struct stbtt__active_edge {
-   next: *mut stbtt__active_edge,
+pub struct ActiveEdge {
+   next: *mut ActiveEdge,
    // TODO: Conditional compilation.
    // #if STBTT_RASTERIZER_VERSION==1
    // int x,dx;
@@ -1740,16 +1737,16 @@ static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, i
 }
 */
 // #elif STBTT_RASTERIZER_VERSION == 2
-pub unsafe fn stbtt__new_active(
-    hh: *mut stbtt__hheap,
-    e: *mut stbtt__edge,
+pub unsafe fn new_active(
+    hh: *mut Hheap,
+    e: *mut Edge,
     off_x: isize,
     start_point: f32,
     userdata: *const ()
-) -> *mut stbtt__active_edge {
-   let z: *mut stbtt__active_edge = stbtt__hheap_alloc(
-       hh, size_of::<stbtt__active_edge>(), userdata)
-        as *mut stbtt__active_edge;
+) -> *mut ActiveEdge {
+   let z: *mut ActiveEdge = hheap_alloc(
+       hh, size_of::<ActiveEdge>(), userdata)
+        as *mut ActiveEdge;
    let dxdy: f32 = ((*e).x1 - (*e).x0) / ((*e).y1 - (*e).y0);
    //STBTT_assert(e->y0 <= start_point);
    if z == null_mut() { return z; }
@@ -1917,60 +1914,60 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
 
 // the edge passed in here does not cross the vertical line at x or the vertical line at x+1
 // (i.e. it has already been clipped to those)
-pub unsafe fn stbtt__handle_clipped_edge(
+pub unsafe fn handle_clipped_edge(
     scanline: *mut f32,
     x: isize,
-    e: *mut stbtt__active_edge,
+    e: *mut ActiveEdge,
     mut x0: f32,
     mut y0: f32,
     mut x1: f32,
     mut y1: f32
 ) {
-   if (y0 == y1) { return; }
+   if y0 == y1 { return; }
    STBTT_assert!(y0 < y1);
    STBTT_assert!((*e).sy <= (*e).ey);
-   if (y0 > (*e).ey) { return; }
-   if (y1 < (*e).sy) { return; }
-   if (y0 < (*e).sy) {
+   if y0 > (*e).ey { return; }
+   if y1 < (*e).sy { return; }
+   if y0 < (*e).sy {
       x0 += (x1-x0) * ((*e).sy - y0) / (y1-y0);
       y0 = (*e).sy;
    }
-   if (y1 > (*e).ey) {
+   if y1 > (*e).ey {
       x1 += (x1-x0) * ((*e).ey - y1) / (y1-y0);
       y1 = (*e).ey;
    }
 
-   if (x0 == x as f32) {
+   if x0 == x as f32 {
       STBTT_assert!(x1 <= x as f32 +1.0);
    }
-   else if (x0 == x as f32 +1.0) {
+   else if x0 == x as f32 +1.0 {
       STBTT_assert!(x1 >= x as f32);
    }
-   else if (x0 <= x as f32) {
+   else if x0 <= x as f32 {
       STBTT_assert!(x1 <= x as f32);
    }
-   else if (x0 >= x as f32 +1.0) {
+   else if x0 >= x as f32 +1.0 {
       STBTT_assert!(x1 >= x as f32 +1.0);
    }
    else {
       STBTT_assert!(x1 >= x as f32 && x1 <= x as f32 +1.0);
    }
 
-   if (x0 <= x as f32 && x1 <= x as f32) {
+   if x0 <= x as f32 && x1 <= x as f32 {
       *scanline.offset(x) += (*e).direction * (y1-y0);
    }
-   else if (x0 >= x as f32 +1.0 && x1 >= x as f32 +1.0) {}
+   else if x0 >= x as f32 +1.0 && x1 >= x as f32 +1.0 {}
    else {
       STBTT_assert!(x0 >= x as f32 && x0 <= x as f32 +1.0 && x1 >= x as f32 && x1 <= x as f32 +1.0);
       *scanline.offset(x) += (*e).direction * (y1-y0) * (1.0-((x0-x as f32)+(x1-x as f32))/2.0); // coverage = 1 - average x position
    }
 }
 
-pub unsafe fn stbtt__fill_active_edges_new(
+pub unsafe fn fill_active_edges_new(
     scanline: *mut f32,
     scanline_fill: *mut f32,
     len: isize,
-    mut e: *mut stbtt__active_edge,
+    mut e: *mut ActiveEdge,
     y_top: f32
 ) {
    let y_bottom: f32 = y_top+1.0;
@@ -1981,20 +1978,20 @@ pub unsafe fn stbtt__fill_active_edges_new(
       // compute intersection points with top & bottom
       STBTT_assert!((*e).ey >= y_top);
 
-      if ((*e).fdx == 0.0) {
+      if (*e).fdx == 0.0 {
          let x0: f32 = (*e).fx;
          if x0 < len as f32 {
             if x0 >= 0.0 {
-               stbtt__handle_clipped_edge(scanline,x0 as isize,e, x0,y_top, x0,y_bottom);
-               stbtt__handle_clipped_edge(scanline_fill.offset(-1),x0 as isize +1,e, x0,y_top, x0,y_bottom);
+               handle_clipped_edge(scanline,x0 as isize,e, x0,y_top, x0,y_bottom);
+               handle_clipped_edge(scanline_fill.offset(-1),x0 as isize +1,e, x0,y_top, x0,y_bottom);
             } else {
-               stbtt__handle_clipped_edge(scanline_fill.offset(-1),0,e, x0,y_top, x0,y_bottom);
+               handle_clipped_edge(scanline_fill.offset(-1),0,e, x0,y_top, x0,y_bottom);
             }
          }
       } else {
          let mut x0: f32 = (*e).fx;
-         let mut dx: f32 = (*e).fdx;
-         let mut xb: f32 = x0 + dx;
+         let dx: f32 = (*e).fdx;
+         let xb: f32 = x0 + dx;
          let mut x_top: f32;
          let mut x_bottom: f32;
          let mut sy0: f32;
@@ -2005,14 +2002,14 @@ pub unsafe fn stbtt__fill_active_edges_new(
          // compute endpoints of line segment clipped to this scanline (if the
          // line segment starts on this scanline. x0 is the intersection of the
          // line with y_top, but that may be off the line segment.
-         if ((*e).sy > y_top) {
+         if (*e).sy > y_top {
             x_top = x0 + dx * ((*e).sy - y_top);
             sy0 = (*e).sy;
          } else {
             x_top = x0;
             sy0 = y_top;
          }
-         if ((*e).ey < y_bottom) {
+         if (*e).ey < y_bottom {
             x_bottom = x0 + dx * ((*e).ey - y_top);
             sy1 = (*e).ey;
          } else {
@@ -2020,13 +2017,13 @@ pub unsafe fn stbtt__fill_active_edges_new(
             sy1 = y_bottom;
          }
 
-         if (x_top >= 0.0
+         if x_top >= 0.0
           && x_bottom >= 0.0
           && x_top < len as f32
-          && x_bottom < len as f32) {
+          && x_bottom < len as f32 {
             // from here on, we don't have to range check x values
 
-            if (x_top as isize == x_bottom as isize) {
+            if x_top as isize == x_bottom as isize {
                let height: f32;
                // simple case, only spans one pixel
                let x = x_top as isize;
@@ -2035,7 +2032,6 @@ pub unsafe fn stbtt__fill_active_edges_new(
                *scanline.offset(x) += (*e).direction * (1.0-((x_top - x as f32) + (x_bottom-x as f32))/2.0)  * height;
                *scanline_fill.offset(x) += (*e).direction * height; // everything right of this pixel is filled
             } else {
-               let x: isize;
                let x1: isize;
                let x2: isize;
                let mut y_crossing: f32;
@@ -2054,11 +2050,8 @@ pub unsafe fn stbtt__fill_active_edges_new(
                   t = x_bottom;
                   x_bottom = x_top;
                   x_top = t;
-                  dx = -dx;
                   dy = -dy;
-                  t = x0;
                   x0 = xb;
-                  xb = t;
                }
 
                x1 = x_top as isize;
@@ -2091,7 +2084,6 @@ pub unsafe fn stbtt__fill_active_edges_new(
             // clipping logic. since this does not match the intended use
             // of this library, we use a different, very slow brute
             // force implementation
-            let x: isize;
             for x in 0..len {
                // cases:
                //
@@ -2122,27 +2114,27 @@ pub unsafe fn stbtt__fill_active_edges_new(
                y2 = (x as f32+1.0 - x0) / dx + y_top;
 
                if x0 < x1 && x3 > x2 {         // three segments descending down-right
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
                } else if x3 < x1 && x0 > x2 {  // three segments descending down-left
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
                } else if x0 < x1 && x3 > x1 {  // two segments across x, down-right
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
                } else if x3 < x1 && x0 > x1 {  // two segments across x, down-left
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
-                  stbtt__handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x1,y1);
+                  handle_clipped_edge(scanline,x,e, x1,y1, x3,y3);
                } else if x0 < x2 && x3 > x2 {  // two segments across x+1, down-right
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
                } else if x3 < x2 && x0 > x2 {  // two segments across x+1, down-left
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
-                  stbtt__handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x2,y2);
+                  handle_clipped_edge(scanline,x,e, x2,y2, x3,y3);
                } else {  // one segment
-                  stbtt__handle_clipped_edge(scanline,x,e, x0,y0, x3,y3);
+                  handle_clipped_edge(scanline,x,e, x0,y0, x3,y3);
                }
             }
          }
@@ -2152,24 +2144,23 @@ pub unsafe fn stbtt__fill_active_edges_new(
 }
 
 // directly AA rasterize edges w/o supersampling
-pub unsafe fn stbtt__rasterize_sorted_edges(
-    result: *mut stbtt__bitmap,
-    mut e: *mut stbtt__edge,
+pub unsafe fn rasterize_sorted_edges(
+    result: *mut Bitmap,
+    mut e: *mut Edge,
     n: isize,
-    vsubsample: isize,
+    _vsubsample: isize,
     off_x: isize,
     off_y: isize,
     userdata: *const ()
 ) {
-   let mut hh: stbtt__hheap = stbtt__hheap {
+   let mut hh: Hheap = Hheap {
       head: null_mut(),
       first_free: null_mut(),
       num_remaining_in_head_chunk: 0,
    };
-   let mut active: *mut stbtt__active_edge = null_mut();
+   let mut active: *mut ActiveEdge = null_mut();
    let mut y: isize;
    let mut j: isize =0;
-   let i: isize;
    let mut scanline_data: [f32; 129] = [0.0; 129];
    let scanline: *mut f32;
    let scanline2: *mut f32;
@@ -2185,37 +2176,35 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
    y = off_y;
    (*e.offset(n)).y0 = (off_y + (*result).h) as f32 + 1.0;
 
-   while (j < (*result).h) {
+   while j < (*result).h {
       // find center of pixel for this scanline
       let scan_y_top: f32 = y as f32 + 0.0;
       let scan_y_bottom: f32 = y as f32 + 1.0;
-      let mut step: *mut *mut stbtt__active_edge = &mut active;
-      // Coped from location B because could not find declaration.
-      let z: *mut stbtt__active_edge = *step;
+      let mut step: *mut *mut ActiveEdge = &mut active;
 
-      STBTT_memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
-      STBTT_memset(scanline2 as *mut c_void, 0,
+      memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
+      memset(scanline2 as *mut c_void, 0,
           ((*result).w+1) as usize * size_of::<f32>());
 
       // update all active edges;
       // remove all active edges that terminate before the top of this scanline
       while (*step) != null_mut() {
           // Location B.
-          let z: *mut stbtt__active_edge = *step;
-         if ((*z).ey <= scan_y_top) {
+          let z: *mut ActiveEdge = *step;
+         if (*z).ey <= scan_y_top {
             *step = (*z).next; // delete from list
             STBTT_assert!((*z).direction != 0.0);
             (*z).direction = 0.0;
-            stbtt__hheap_free(&mut hh, z as *mut ());
+            hheap_free(&mut hh, z as *mut ());
          } else {
             step = &mut ((**step).next); // advance through list
          }
       }
 
       // insert all edges that start before the bottom of this scanline
-      while ((*e).y0 <= scan_y_bottom) {
-         if ((*e).y0 != (*e).y1) {
-            let z: *mut stbtt__active_edge = stbtt__new_active(
+      while (*e).y0 <= scan_y_bottom {
+         if (*e).y0 != (*e).y1 {
+            let z: *mut ActiveEdge = new_active(
                 &mut hh, e, off_x, scan_y_top, userdata);
             STBTT_assert!((*z).ey >= scan_y_top);
             // insert at front
@@ -2227,7 +2216,7 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
 
       // now process all active edges
       if active != null_mut() {
-         stbtt__fill_active_edges_new(scanline, scanline2.offset(1), (*result).w,
+         fill_active_edges_new(scanline, scanline2.offset(1), (*result).w,
             active, scan_y_top);
       }
 
@@ -2247,7 +2236,7 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
       // advance all the edges
       step = &mut active;
       while *step != null_mut() {
-         let z: *mut stbtt__active_edge = *step;
+         let z: *mut ActiveEdge = *step;
          (*z).fx += (*z).fdx; // advance to position for current scanline
          step = &mut ((**step).next); // advance through list
       }
@@ -2256,7 +2245,7 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
       j += 1;
    }
 
-   stbtt__hheap_cleanup(&mut hh, userdata);
+   hheap_cleanup(&mut hh, userdata);
 
    if scanline != scanline_data.as_mut_ptr() {
       STBTT_free!(scanline as *mut c_void);
@@ -2268,27 +2257,26 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
 
 macro_rules! STBTT__COMPARE {
     ($a:expr, $b:expr) => {
-        (($a).y0 < ($b).y0)
+        ($a).y0 < ($b).y0
     }
 }
 
 // #define STBTT__COMPARE(a,b)  ((a)->y0 < (b)->y0)
 
-pub unsafe fn stbtt__sort_edges_ins_sort(
-    p: *mut stbtt__edge,
+pub unsafe fn sort_edges_ins_sort(
+    p: *mut Edge,
     n: isize
 ) {
-   let i: isize;
    let mut j: isize;
    for i in 1..n {
-      let t: stbtt__edge = *p.offset(i);
-      let a: *const stbtt__edge = &t;
+      let t: Edge = *p.offset(i);
+      let a: *const Edge = &t;
       j = i;
-      while (j > 0) {
-         let b: *const stbtt__edge = p.offset(j-1);
+      while j > 0 {
+         let b: *const Edge = p.offset(j-1);
          let c = STBTT__COMPARE!((*a),(*b));
          if !c { break; }
-         (*p.offset(j)) = (*p.offset(j-1));
+         *p.offset(j) = *p.offset(j-1);
          j -= 1;
       }
       if i != j {
@@ -2297,11 +2285,11 @@ pub unsafe fn stbtt__sort_edges_ins_sort(
    }
 }
 
-pub unsafe fn stbtt__sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
+pub unsafe fn sort_edges_quicksort(mut p: *mut Edge, mut n: isize)
 {
    /* threshhold for transitioning to insertion sort */
-   while (n > 12) {
-      let mut t: stbtt__edge;
+   while n > 12 {
+      let mut t: Edge;
       let c01: bool;
       let c12: bool;
       let c: bool;
@@ -2314,22 +2302,22 @@ pub unsafe fn stbtt__sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
       c01 = STBTT__COMPARE!((*p.offset(0)),(*p.offset(m)));
       c12 = STBTT__COMPARE!((*p.offset(m)),(*p.offset(n-1)));
       /* if 0 >= mid >= end, or 0 < mid < end, then use mid */
-      if (c01 != c12) {
+      if c01 != c12 {
          /* otherwise, we'll need to swap something else to middle */
          let z: isize;
          c = STBTT__COMPARE!((*p.offset(0)),(*p.offset(n-1)));
          /* 0>mid && mid<n:  0>n => n; 0<n => 0 */
          /* 0<mid && mid>n:  0>n => 0; 0<n => n */
          z = if c == c12 { 0 } else { n-1 };
-         t = (*p.offset(z));
-         (*p.offset(z)) = (*p.offset(m));
-         (*p.offset(m)) = t;
+         t = *p.offset(z);
+         *p.offset(z) = *p.offset(m);
+         *p.offset(m) = t;
       }
       /* now p[m] is the median-of-three */
       /* swap it to the beginning so it won't move around */
-      t = (*p.offset(0));
-      (*p.offset(0)) = (*p.offset(m));
-      (*p.offset(m)) = t;
+      t = *p.offset(0);
+      *p.offset(0) = *p.offset(m);
+      *p.offset(m) = t;
 
       /* partition loop */
       i=1;
@@ -2355,31 +2343,31 @@ pub unsafe fn stbtt__sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
          j -= 1;
       }
       /* recurse on smaller side, iterate on larger */
-      if (j < (n-i)) {
-         stbtt__sort_edges_quicksort(p,j);
+      if j < (n-i) {
+         sort_edges_quicksort(p,j);
          p = p.offset(i);
          n = n-i;
       } else {
-         stbtt__sort_edges_quicksort(p.offset(i), n-i);
+         sort_edges_quicksort(p.offset(i), n-i);
          n = j;
       }
    }
 }
 
-pub unsafe fn stbtt__sort_edges(p: *mut stbtt__edge, n: isize) {
-   stbtt__sort_edges_quicksort(p, n);
-   stbtt__sort_edges_ins_sort(p, n);
+pub unsafe fn sort_edges(p: *mut Edge, n: isize) {
+   sort_edges_quicksort(p, n);
+   sort_edges_ins_sort(p, n);
 }
 
-pub struct stbtt__point
+pub struct Point
 {
    x: f32,
    y: f32,
 }
 
-pub unsafe fn stbtt__rasterize(
-    result: *mut stbtt__bitmap,
-    pts: *mut stbtt__point,
+unsafe fn rasterize_(
+    result: *mut Bitmap,
+    pts: *mut Point,
     wcount: *mut isize,
     windings: isize,
     scale_x: f32,
@@ -2392,11 +2380,9 @@ pub unsafe fn stbtt__rasterize(
     userdata: *const ()
 ) {
    let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
-   let e: *mut stbtt__edge;
+   let e: *mut Edge;
    let mut n: isize;
-   let i: isize;
    let mut j: isize;
-   let k: isize;
    let mut m: isize;
 // TODO: Conditional compilation.
 // #if STBTT_RASTERIZER_VERSION == 1
@@ -2414,14 +2400,14 @@ pub unsafe fn stbtt__rasterize(
       n = n + *wcount.offset(i);
    }
 
-   e = STBTT_malloc!(size_of::<stbtt__edge>() * (n+1) as usize)
-        as *mut stbtt__edge; // add an extra one as a sentinel
+   e = STBTT_malloc!(size_of::<Edge>() * (n+1) as usize)
+        as *mut Edge; // add an extra one as a sentinel
    if e == null_mut() { return };
    n = 0;
 
    m=0;
    for i in 0..windings {
-      let p: *const stbtt__point = pts.offset(m);
+      let p: *const Point = pts.offset(m);
       m += *wcount.offset(i);
       j = *wcount.offset(i)-1;
       for k in 0..(*wcount.offset(i)) {
@@ -2450,16 +2436,16 @@ pub unsafe fn stbtt__rasterize(
 
    // now sort the edges by their highest point (should snap to integer, and then by x)
    //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
-   stbtt__sort_edges(e, n);
+   sort_edges(e, n);
 
    // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
-   stbtt__rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
+   rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
 
    STBTT_free!(e as *mut c_void);
 }
 
-pub unsafe fn stbtt__add_point(
-    points: *mut stbtt__point,
+pub unsafe fn add_point(
+    points: *mut Point,
     n: isize,
     x: f32,
     y: f32
@@ -2470,8 +2456,8 @@ pub unsafe fn stbtt__add_point(
 }
 
 // tesselate until threshhold p is happy... @TODO warped to compensate for non-linear stretching
-pub unsafe fn stbtt__tesselate_curve(
-    points: *mut stbtt__point,
+pub unsafe fn tesselate_curve(
+    points: *mut Point,
     num_points: *mut isize,
     x0: f32,
     y0: f32,
@@ -2491,37 +2477,35 @@ pub unsafe fn stbtt__tesselate_curve(
    if n > 16 { // 65536 segments on one curve better be enough!
       return 1;
    }
-   if (dx*dx+dy*dy > objspace_flatness_squared) { // half-pixel error allowed... need to be smaller if AA
-      stbtt__tesselate_curve(points, num_points, x0,y0, (x0+x1)/2.0,(y0+y1)/2.0, mx,my, objspace_flatness_squared,n+1);
-      stbtt__tesselate_curve(points, num_points, mx,my, (x1+x2)/2.0,(y1+y2)/2.0, x2,y2, objspace_flatness_squared,n+1);
+   if dx*dx+dy*dy > objspace_flatness_squared { // half-pixel error allowed... need to be smaller if AA
+      tesselate_curve(points, num_points, x0,y0, (x0+x1)/2.0,(y0+y1)/2.0, mx,my, objspace_flatness_squared,n+1);
+      tesselate_curve(points, num_points, mx,my, (x1+x2)/2.0,(y1+y2)/2.0, x2,y2, objspace_flatness_squared,n+1);
    } else {
-      stbtt__add_point(points, *num_points,x2,y2);
+      add_point(points, *num_points,x2,y2);
       *num_points = *num_points+1;
    }
    return 1;
 }
 
 // returns number of contours
-pub unsafe fn stbtt_FlattenCurves(
-    vertices: *mut stbtt_vertex,
+pub unsafe fn flatten_curves(
+    vertices: *mut Vertex,
     num_verts: isize,
     objspace_flatness: f32,
     contour_lengths: *mut *mut isize,
     num_contours: *mut isize,
-    userdata: *const ()
-) -> *mut stbtt__point {
-    let mut points: *mut stbtt__point = null_mut();
+    _userdata: *const ()
+) -> *mut Point {
+    let mut points: *mut Point = null_mut();
     let mut num_points: isize =0;
 
    let objspace_flatness_squared: f32 = objspace_flatness * objspace_flatness;
-   let i: isize;
    let mut n: isize =0;
    let mut start: isize =0;
-   let pass: isize;
 
    // count how many "moves" there are to get the contour count
    for i in 0..num_verts {
-      if (*vertices.offset(i)).type_ == STBTT_cmd::vmove {
+      if (*vertices.offset(i)).type_ == Cmd::Move {
          n += 1;
       }
    }
@@ -2531,30 +2515,30 @@ pub unsafe fn stbtt_FlattenCurves(
 
    *contour_lengths = STBTT_malloc!(size_of::<isize>() * n as usize) as *mut isize;
 
-   if (*contour_lengths == null_mut()) {
+   if *contour_lengths == null_mut() {
       *num_contours = 0;
       return null_mut();
    }
 
+   'error: loop {
    // make two passes through the points so we don't need to realloc
    for pass in 0..2 {
       let mut x: f32=0.0;
       let mut y: f32=0.0;
-      if (pass == 1) {
-         points = STBTT_malloc!(num_points as usize * size_of::<stbtt__point>())
-            as *mut stbtt__point;
+      if pass == 1 {
+         points = STBTT_malloc!(num_points as usize * size_of::<Point>())
+            as *mut Point;
          if points == null_mut() {
-             // TODO: Goto.
-             // goto error
+             break 'error;
          };
       }
       num_points = 0;
       n= -1;
       for i in 0..num_verts {
          match (*vertices.offset(i)).type_ {
-            STBTT_cmd::vmove => {
+            Cmd::Move => {
                // start the next contour
-               if (n >= 0) {
+               if n >= 0 {
                   *(*contour_lengths).offset(n) = num_points - start;
                }
                n += 1;
@@ -2562,17 +2546,17 @@ pub unsafe fn stbtt_FlattenCurves(
 
                x = (*vertices.offset(i)).x as f32;
                y = (*vertices.offset(i)).y as f32;
-               stbtt__add_point(points, num_points, x,y);
+               add_point(points, num_points, x,y);
                num_points += 1;
             }
-            STBTT_cmd::vline => {
+            Cmd::Line => {
                x = (*vertices.offset(i)).x as f32;
                y = (*vertices.offset(i)).y as f32;
-               stbtt__add_point(points, num_points, x, y);
+               add_point(points, num_points, x, y);
                num_points += 1;
             }
-            STBTT_cmd::vcurve => {
-               stbtt__tesselate_curve(points, &mut num_points, x,y,
+            Cmd::Curve => {
+               tesselate_curve(points, &mut num_points, x,y,
                                         (*vertices.offset(i)).cx as f32, (*vertices.offset(i)).cy as f32,
                                         (*vertices.offset(i)).x as f32,  (*vertices.offset(i)).y as f32,
                                         objspace_flatness_squared, 0);
@@ -2583,10 +2567,9 @@ pub unsafe fn stbtt_FlattenCurves(
       }
       *(*contour_lengths).offset(n) = num_points - start;
    }
-
    return points;
-   // TODO: Label.
-// error:
+   } // 'error
+
    STBTT_free!(points as *mut c_void);
    STBTT_free!(*contour_lengths as *mut c_void);
    *contour_lengths = null_mut();
@@ -2595,13 +2578,13 @@ pub unsafe fn stbtt_FlattenCurves(
 }
 
 // rasterize a shape with quadratic beziers into a bitmap
-pub unsafe fn stbtt_Rasterize(
+pub unsafe fn rasterize(
     // 1-channel bitmap to draw into
-    result: *mut stbtt__bitmap,
+    result: *mut Bitmap,
     // allowable error of curve in pixels
     flatness_in_pixels: f32,
     // array of vertices defining shape
-    vertices: *mut stbtt_vertex,
+    vertices: *mut Vertex,
     // number of vertices in above array
     num_verts: isize,
     // scale applied to input vertices
@@ -2621,10 +2604,10 @@ pub unsafe fn stbtt_Rasterize(
    let scale: f32 = if scale_x > scale_y { scale_y } else { scale_x };
    let mut winding_count: isize = 0;
    let mut winding_lengths: *mut isize = null_mut();
-   let windings: *mut stbtt__point = stbtt_FlattenCurves(vertices, num_verts,
+   let windings: *mut Point = flatten_curves(vertices, num_verts,
        flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count, userdata);
    if windings != null_mut() {
-      stbtt__rasterize(result, windings, winding_lengths, winding_count,
+      rasterize_(result, windings, winding_lengths, winding_count,
           scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert, userdata);
       STBTT_free!(winding_lengths as *mut c_void);
       STBTT_free!(windings as *mut c_void);
@@ -2632,13 +2615,13 @@ pub unsafe fn stbtt_Rasterize(
 }
 
 // frees the bitmap allocated below
-pub unsafe fn stbtt_FreeBitmap(bitmap: *mut u8, userdata: *const ())
+pub unsafe fn free_bitmap(bitmap: *mut u8, _userdata: *const ())
 {
    STBTT_free!(bitmap as *mut c_void);
 }
 
-pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_bitmap_subpixel(
+    info: *const FontInfo,
     mut scale_x: f32,
     mut scale_y: f32,
     shift_x: f32,
@@ -2653,8 +2636,8 @@ pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
    let mut iy0: isize = 0;
    let mut ix1: isize = 0;
    let mut iy1: isize = 0;
-   let mut vertices: *mut stbtt_vertex = null_mut();
-   let num_verts: isize = stbtt_GetGlyphShape(info, glyph, &mut vertices);
+   let mut vertices: *mut Vertex = null_mut();
+   let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
    if scale_x == 0.0 { scale_x = scale_y; }
    if scale_y == 0.0 {
@@ -2662,11 +2645,11 @@ pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
       scale_y = scale_x;
    }
 
-   stbtt_GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y,
+   get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
        shift_x, shift_y, &mut ix0,&mut iy0,&mut ix1,&mut iy1);
 
    // now we get the size
-   let mut gbm = stbtt__bitmap
+   let mut gbm = Bitmap
    {
        w: (ix1 - ix0),
        h: (iy1 - iy0),
@@ -2684,7 +2667,7 @@ pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
       if gbm.pixels != null_mut() {
          gbm.stride = gbm.w;
 
-         stbtt_Rasterize(&mut gbm, 0.35,
+         rasterize(&mut gbm, 0.35,
              vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0, iy0,
               1, (*info).userdata);
       }
@@ -2696,8 +2679,8 @@ pub unsafe fn stbtt_GetGlyphBitmapSubpixel(
 // the following functions are equivalent to the above functions, but operate
 // on glyph indices instead of Unicode codepoints (for efficiency)
 
-pub unsafe fn stbtt_GetGlyphBitmap(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_glyph_bitmap(
+    info: *const FontInfo,
     scale_x: f32,
     scale_y: f32,
     glyph: isize,
@@ -2706,12 +2689,12 @@ pub unsafe fn stbtt_GetGlyphBitmap(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *const u8 {
-   return stbtt_GetGlyphBitmapSubpixel(info, scale_x, scale_y,
+   return get_glyph_bitmap_subpixel(info, scale_x, scale_y,
        0.0, 0.0, glyph, width, height, xoff, yoff);
 }
 
-pub unsafe fn stbtt_MakeGlyphBitmapSubpixel(
-    info: *const stbtt_fontinfo,
+pub unsafe fn make_glyph_bitmap_subpixel(
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2724,12 +2707,12 @@ pub unsafe fn stbtt_MakeGlyphBitmapSubpixel(
 ) {
    let mut ix0: isize = 0;
    let mut iy0: isize = 0;
-   let mut vertices: *mut stbtt_vertex = null_mut();
-   let num_verts: isize = stbtt_GetGlyphShape(info, glyph, &mut vertices);
+   let mut vertices: *mut Vertex = null_mut();
+   let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
-   stbtt_GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y,
+   get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
        shift_x, shift_y, &mut ix0,&mut iy0,null_mut(),null_mut());
-   let mut gbm: stbtt__bitmap = stbtt__bitmap
+   let mut gbm: Bitmap = Bitmap
    {
        w: out_w,
        h: out_h,
@@ -2738,15 +2721,15 @@ pub unsafe fn stbtt_MakeGlyphBitmapSubpixel(
    };
 
    if gbm.w != 0 && gbm.h != 0 {
-      stbtt_Rasterize(&mut gbm, 0.35, vertices, num_verts,
+      rasterize(&mut gbm, 0.35, vertices, num_verts,
           scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1, (*info).userdata);
    }
 
    STBTT_free!(vertices as *mut c_void);
 }
 
-pub unsafe fn stbtt_MakeGlyphBitmap(
-    info: *const stbtt_fontinfo,
+pub unsafe fn make_glyph_bitmap(
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2755,14 +2738,14 @@ pub unsafe fn stbtt_MakeGlyphBitmap(
     scale_y: f32,
     glyph: isize
 ) {
-   stbtt_MakeGlyphBitmapSubpixel(info, output, out_w, out_h,
+   make_glyph_bitmap_subpixel(info, output, out_w, out_h,
        out_stride, scale_x, scale_y, 0.0,0.0, glyph);
 }
 
 // the same as stbtt_GetCodepoitnBitmap, but you can specify a subpixel
 // shift for the character
-pub unsafe fn stbtt_GetCodepointBitmapSubpixel(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_codepoint_bitmap_subpixel(
+    info: *const FontInfo,
     scale_x: f32,
     scale_y: f32,
     shift_x: f32,
@@ -2773,14 +2756,14 @@ pub unsafe fn stbtt_GetCodepointBitmapSubpixel(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *mut u8 {
-   return stbtt_GetGlyphBitmapSubpixel(info, scale_x,
-       scale_y,shift_x,shift_y, stbtt_FindGlyphIndex(info,codepoint), width,height,xoff,yoff);
+   return get_glyph_bitmap_subpixel(info, scale_x,
+       scale_y,shift_x,shift_y, find_glyph_index(info,codepoint), width,height,xoff,yoff);
 }
 
 // same as stbtt_MakeCodepointBitmap, but you can specify a subpixel
 // shift for the character
-pub unsafe fn stbtt_MakeCodepointBitmapSubpixel(
-    info: *const stbtt_fontinfo,
+pub unsafe fn make_codepoint_bitmap_subpixel(
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2791,9 +2774,9 @@ pub unsafe fn stbtt_MakeCodepointBitmapSubpixel(
     shift_y: f32,
     codepoint: isize
 ) {
-   stbtt_MakeGlyphBitmapSubpixel(info, output, out_w, out_h,
+   make_glyph_bitmap_subpixel(info, output, out_w, out_h,
        out_stride, scale_x, scale_y, shift_x, shift_y,
-       stbtt_FindGlyphIndex(info,codepoint));
+       find_glyph_index(info,codepoint));
 }
 
 // allocates a large-enough single-channel 8bpp bitmap and renders the
@@ -2803,8 +2786,8 @@ pub unsafe fn stbtt_MakeCodepointBitmapSubpixel(
 // which is stored left-to-right, top-to-bottom.
 //
 // xoff/yoff are the offset it pixel space from the glyph origin to the top-left of the bitmap
-pub unsafe fn stbtt_GetCodepointBitmap(
-    info: *const stbtt_fontinfo,
+pub unsafe fn get_codepoint_bitmap(
+    info: *const FontInfo,
     scale_x: f32,
     scale_y: f32,
     codepoint: isize,
@@ -2813,7 +2796,7 @@ pub unsafe fn stbtt_GetCodepointBitmap(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *mut u8 {
-   return stbtt_GetCodepointBitmapSubpixel(info, scale_x, scale_y,
+   return get_codepoint_bitmap_subpixel(info, scale_x, scale_y,
        0.0,0.0, codepoint, width,height,xoff,yoff);
 }
 
@@ -2821,8 +2804,8 @@ pub unsafe fn stbtt_GetCodepointBitmap(
 // in the form of 'output', with row spacing of 'out_stride' bytes. the bitmap
 // is clipped to out_w/out_h bytes. Call stbtt_GetCodepointBitmapBox to get the
 // width and height and positioning info for it first.
-pub unsafe fn stbtt_MakeCodepointBitmap(
-    info: *const stbtt_fontinfo,
+pub unsafe fn make_codepoint_bitmap(
+    info: *const FontInfo,
     output: *mut u8,
     out_w: isize,
     out_h: isize,
@@ -2831,7 +2814,7 @@ pub unsafe fn stbtt_MakeCodepointBitmap(
     scale_y: f32,
     codepoint: isize
 ) {
-   stbtt_MakeCodepointBitmapSubpixel(info, output, out_w, out_h,
+   make_codepoint_bitmap_subpixel(info, output, out_w, out_h,
        out_stride, scale_x, scale_y, 0.0,0.0, codepoint);
 }
 
@@ -2844,23 +2827,22 @@ pub unsafe fn stbtt_MakeCodepointBitmap(
 // if return is negative, returns the negative of the number of characters that fit
 // if return is 0, no characters fit and no rows were used
 // This uses a very crappy packing.
-pub unsafe fn stbtt_BakeFontBitmap(
+pub unsafe fn bake_font_bitmap(
     data: *mut u8, offset: isize,  // font location (use offset=0 for plain .ttf)
     pixel_height: f32,                     // height of font in pixels
     pixels: *mut u8, pw: isize, ph: isize,  // bitmap to be filled in
     first_char: isize, num_chars: isize,          // characters to bake
-    chardata: *mut stbtt_bakedchar
+    chardata: *mut BakedChar
 ) -> isize {
     let scale: f32;
     let mut x: isize;
     let mut y: isize;
     let mut bottom_y: isize;
-    let i: isize;
-    let mut f: stbtt_fontinfo = stbtt_fontinfo {
+    let mut f: FontInfo = FontInfo {
        userdata: null(),
        data: null_mut(),
        fontstart: 0,
-       numGlyphs: 0,
+       num_glyphs: 0,
        loca: 0,
        head: 0,
        glyf: 0,
@@ -2868,17 +2850,17 @@ pub unsafe fn stbtt_BakeFontBitmap(
        hmtx: 0,
        kern: 0,
        index_map: 0,
-       indexToLocFormat: 0,
+       index_to_loc_format: 0,
     };
-    if stbtt_InitFont(&mut f, data, offset) == 0 {
+    if init_font(&mut f, data, offset) == 0 {
          return -1;
     }
-   STBTT_memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+   memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    x=1;
    y=1;
    bottom_y = 1;
 
-   scale = stbtt_ScaleForPixelHeight(&f, pixel_height);
+   scale = scale_for_pixel_height(&f, pixel_height);
 
    for i in 0..num_chars {
       let mut advance: isize = 0;
@@ -2889,9 +2871,9 @@ pub unsafe fn stbtt_BakeFontBitmap(
       let mut y1: isize = 0;
       let gw: isize;
       let gh: isize;
-      let g: isize = stbtt_FindGlyphIndex(&f, first_char + i);
-      stbtt_GetGlyphHMetrics(&f, g, &mut advance, &mut lsb);
-      stbtt_GetGlyphBitmapBox(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
+      let g: isize = find_glyph_index(&f, first_char + i);
+      get_glyph_hmetrics(&f, g, &mut advance, &mut lsb);
+      get_glyph_bitmap_box(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
       gw = x1-x0;
       gh = y1-y0;
       if x + gw + 1 >= pw {
@@ -2903,11 +2885,11 @@ pub unsafe fn stbtt_BakeFontBitmap(
       }
       STBTT_assert!(x+gw < pw);
       STBTT_assert!(y+gh < ph);
-      stbtt_MakeGlyphBitmap(&f, pixels.offset(x+y*pw), gw,gh,pw, scale,scale, g);
-      (*chardata.offset(i)).x0 = x as stbtt_uint16;
-      (*chardata.offset(i)).y0 = y as stbtt_uint16;
-      (*chardata.offset(i)).x1 = (x + gw) as stbtt_uint16;
-      (*chardata.offset(i)).y1 = (y + gh) as stbtt_uint16;
+      make_glyph_bitmap(&f, pixels.offset(x+y*pw), gw,gh,pw, scale,scale, g);
+      (*chardata.offset(i)).x0 = x as u16;
+      (*chardata.offset(i)).y0 = y as u16;
+      (*chardata.offset(i)).x1 = (x + gw) as u16;
+      (*chardata.offset(i)).y1 = (y + gh) as u16;
       (*chardata.offset(i)).xadvance = scale * advance as f32;
       (*chardata.offset(i)).xoff     = x0 as f32;
       (*chardata.offset(i)).yoff     = y0 as f32;
@@ -2928,8 +2910,8 @@ pub unsafe fn stbtt_BakeFontBitmap(
 // see discussion of "BASELINE" above.
 //
 // It's inefficient; you might want to c&p it and optimize it.
-pub unsafe fn stbtt_GetBakedQuad(
-    chardata: *mut stbtt_bakedchar,
+pub unsafe fn get_baked_quad(
+    chardata: *mut BakedChar,
     pw: isize,
     ph: isize,
     // character to display
@@ -2937,14 +2919,14 @@ pub unsafe fn stbtt_GetBakedQuad(
     // pointers to current position in screen pixel space
     xpos: *mut f32,
     ypos: *const f32,
-    q: *mut stbtt_aligned_quad, // output: quad to draw
+    q: *mut AlignedQuad, // output: quad to draw
     opengl_fillrule: isize
 )
 {
    let d3d_bias: f32 = if opengl_fillrule != 0 { 0.0 } else { -0.5 };
    let ipw: f32 = 1.0 / pw as f32;
    let iph = 1.0 / ph as f32;
-   let b: *mut stbtt_bakedchar = chardata.offset(char_index);
+   let b: *mut BakedChar = chardata.offset(char_index);
    let round_x: isize = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5);
    let round_y: isize = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5);
 
@@ -2978,7 +2960,7 @@ macro_rules! STBTT__NOTUSED {
 // #define STBTT__NOTUSED(v)  (void)sizeof(v)
 // #endif
 
-type stbrp_coord = isize;
+type Coord = isize;
 
 ////////////////////////////////////////////////////////////////////////////////////
 //                                                                                //
@@ -2991,7 +2973,7 @@ type stbrp_coord = isize;
 //                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////
 
-pub struct stbrp_context
+pub struct Context
 {
    width: isize,
    height: isize,
@@ -3000,15 +2982,17 @@ pub struct stbrp_context
    bottom_y: isize,
 }
 
-pub struct stbrp_node
+#[allow(dead_code)]
+pub struct Node
 {
    x: u8,
 }
 
-pub struct stbrp_rect
+#[allow(dead_code)]
+pub struct Rect
 {
-    x: stbrp_coord,
-    y: stbrp_coord,
+    x: Coord,
+    y: Coord,
     id: isize,
     w: isize,
     h: isize,
@@ -3016,11 +3000,11 @@ pub struct stbrp_rect
 }
 
 pub unsafe fn stbrp_init_target(
-    con: *mut stbrp_context,
+    con: *mut Context,
     pw: isize,
     ph: isize,
-    nodes: *mut stbrp_node,
-    num_nodes: isize
+    _nodes: *mut Node,
+    _num_nodes: isize
 ) {
    (*con).width  = pw;
    (*con).height = ph;
@@ -3032,24 +3016,23 @@ pub unsafe fn stbrp_init_target(
 }
 
 pub unsafe fn stbrp_pack_rects(
-    con: *mut stbrp_context,
-    rects: *mut stbrp_rect,
+    con: *mut Context,
+    rects: *mut Rect,
     num_rects: isize
 ) {
-   let i: isize;
    for i in 0..num_rects {
-      if ((*con).x + (*rects.offset(i)).w > (*con).width) {
+      if (*con).x + (*rects.offset(i)).w > (*con).width {
          (*con).x = 0;
          (*con).y = (*con).bottom_y;
       }
-      if ((*con).y + (*rects.offset(i)).h > (*con).height) {
+      if (*con).y + (*rects.offset(i)).h > (*con).height {
          break;
       }
       (*rects.offset(i)).x = (*con).x;
       (*rects.offset(i)).y = (*con).y;
       (*rects.offset(i)).was_packed = 1;
       (*con).x += (*rects.offset(i)).w;
-      if ((*con).y + (*rects.offset(i)).h > (*con).bottom_y) {
+      if (*con).y + (*rects.offset(i)).h > (*con).bottom_y {
          (*con).bottom_y = (*con).y + (*rects.offset(i)).h;
       }
    }
@@ -3066,7 +3049,7 @@ pub unsafe fn stbrp_pack_rects(
 // This is SUPER-AWESOME (tm Ryan Gordon) packing using stb_rect_pack.h. If
 // stb_rect_pack.h isn't available, it uses the BakeFontBitmap strategy.
 
-// Initializes a packing context stored in the passed-in stbtt_pack_context.
+// Initializes a packing context stored in the passed-in PackContext.
 // Future calls using this context will pack characters into the bitmap passed
 // in here: a 1-channel bitmap that is weight x height. stride_in_bytes is
 // the distance from one row to the next (or 0 to mean they are packed tightly
@@ -3075,8 +3058,8 @@ pub unsafe fn stbrp_pack_rects(
 // bilinear filtering).
 //
 // Returns 0 on failure, 1 on success.
-pub unsafe fn stbtt_PackBegin(
-    spc: *mut stbtt_pack_context,
+pub unsafe fn pack_begin(
+    spc: *mut PackContext,
     pixels: *mut u8,
     pw: isize,
     ph: isize,
@@ -3085,11 +3068,11 @@ pub unsafe fn stbtt_PackBegin(
     alloc_context: *const ()
 ) -> isize
 {
-   let context: *mut stbrp_context = STBTT_malloc!(
-       size_of::<stbrp_context>()) as *mut stbrp_context;
+   let context: *mut Context = STBTT_malloc!(
+       size_of::<Context>()) as *mut Context;
    let num_nodes: isize = pw - padding;
-   let nodes: *mut stbrp_node = STBTT_malloc!(
-       size_of::<stbrp_node>() * num_nodes as usize) as *mut stbrp_node;
+   let nodes: *mut Node = STBTT_malloc!(
+       size_of::<Node>() * num_nodes as usize) as *mut Node;
 
    if context == null_mut() || nodes == null_mut() {
       if context != null_mut() { STBTT_free!(context as *mut c_void); }
@@ -3111,14 +3094,14 @@ pub unsafe fn stbtt_PackBegin(
    stbrp_init_target(context, pw-padding, ph-padding, nodes, num_nodes);
 
    if pixels != null_mut() {
-      STBTT_memset(pixels as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+      memset(pixels as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    }
 
    return 1;
 }
 
 // Cleans up the packing context and frees all memory.
-pub unsafe fn stbtt_PackEnd(spc: *mut stbtt_pack_context)
+pub unsafe fn pack_end(spc: *mut PackContext)
 {
    STBTT_free!((*spc).nodes);
    STBTT_free!((*spc).pack_info);
@@ -3138,24 +3121,24 @@ pub unsafe fn stbtt_PackEnd(spc: *mut stbtt_pack_context)
 //
 // To use with PackFontRangesGather etc., you must set it before calls
 // call to PackFontRangesGatherRects.
-pub unsafe fn stbtt_PackSetOversampling(
-    spc: *mut stbtt_pack_context,
+pub unsafe fn pack_set_oversampling(
+    spc: *mut PackContext,
     h_oversample: usize,
     v_oversample: usize)
 {
    STBTT_assert!(h_oversample <= STBTT_MAX_OVERSAMPLE);
    STBTT_assert!(v_oversample <= STBTT_MAX_OVERSAMPLE);
-   if (h_oversample <= STBTT_MAX_OVERSAMPLE) {
+   if h_oversample <= STBTT_MAX_OVERSAMPLE {
       (*spc).h_oversample = h_oversample;
    }
-   if (v_oversample <= STBTT_MAX_OVERSAMPLE) {
+   if v_oversample <= STBTT_MAX_OVERSAMPLE {
       (*spc).v_oversample = v_oversample;
    }
 }
 
 const STBTT__OVER_MASK: usize = (STBTT_MAX_OVERSAMPLE-1);
 
-pub unsafe fn stbtt__h_prefilter(
+pub unsafe fn h_prefilter(
     mut pixels: *mut u8,
     w: isize,
     h: isize,
@@ -3164,11 +3147,9 @@ pub unsafe fn stbtt__h_prefilter(
 ) {
    let mut buffer: [u8; STBTT_MAX_OVERSAMPLE] = [0; STBTT_MAX_OVERSAMPLE];
    let safe_w: isize = w - kernel_width as isize;
-   let j: isize;
-   for j in 0..h {
-      let i: isize;
+   for _ in 0..h {
       let mut total: usize;
-      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
+      memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 
@@ -3221,7 +3202,7 @@ pub unsafe fn stbtt__h_prefilter(
    }
 }
 
-pub unsafe fn stbtt__v_prefilter(
+pub unsafe fn v_prefilter(
     mut pixels: *mut u8,
     w: isize,
     h: isize,
@@ -3230,11 +3211,9 @@ pub unsafe fn stbtt__v_prefilter(
 ) {
    let mut buffer: [u8; STBTT_MAX_OVERSAMPLE] = [0; STBTT_MAX_OVERSAMPLE];
    let safe_h: isize = h - kernel_width as isize;
-   let j: isize;
-   for j in 0..w {
-      let i: isize;
+   for _ in 0..w {
       let mut total: usize;
-      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
+      memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 
@@ -3287,7 +3266,7 @@ pub unsafe fn stbtt__v_prefilter(
    }
 }
 
-pub fn stbtt__oversample_shift(oversample: isize) -> f32
+pub fn oversample_shift(oversample: isize) -> f32
 {
    if oversample == 0 {
       return 0.0;
@@ -3315,22 +3294,20 @@ pub fn stbtt__oversample_shift(oversample: isize) -> f32
 // (or it may not).
 
 // rects array must be big enough to accommodate all characters in the given ranges
-pub unsafe fn stbtt_PackFontRangesGatherRects(
-    spc: *mut stbtt_pack_context,
-    info: *mut stbtt_fontinfo,
-    ranges: *mut stbtt_pack_range,
+pub unsafe fn pack_font_ranges_gather_rects(
+    spc: *mut PackContext,
+    info: *mut FontInfo,
+    ranges: *mut PackRange,
     num_ranges: isize,
-    rects: *mut stbrp_rect
+    rects: *mut Rect
 ) -> isize {
-   let i: isize;
-   let j: isize;
    let mut k: isize;
 
    k=0;
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
-      let scale: f32 = if fh > 0.0 { stbtt_ScaleForPixelHeight(info, fh) }
-        else { stbtt_ScaleForMappingEmToPixels(info, -fh) };
+      let scale: f32 = if fh > 0.0 { scale_for_pixel_height(info, fh) }
+        else { scale_for_mapping_em_to_pixels(info, -fh) };
       (*ranges.offset(i)).h_oversample = (*spc).h_oversample as u8;
       (*ranges.offset(i)).v_oversample = (*spc).v_oversample as u8;
       for j in 0..(*ranges.offset(i)).num_chars {
@@ -3343,14 +3320,14 @@ pub unsafe fn stbtt_PackFontRangesGatherRects(
              } else {
                 *(*ranges.offset(i)).array_of_unicode_codepoints.offset(j)
              };
-         let glyph: isize = stbtt_FindGlyphIndex(info, codepoint);
-         stbtt_GetGlyphBitmapBoxSubpixel(info,glyph,
+         let glyph: isize = find_glyph_index(info, codepoint);
+         get_glyph_bitmap_box_subpixel(info,glyph,
                                          scale * (*spc).h_oversample as f32,
                                          scale * (*spc).v_oversample as f32,
                                          0.0,0.0,
                                          &mut x0,&mut y0,&mut x1,&mut y1);
-         (*rects.offset(k)).w = (x1-x0 + (*spc).padding as isize + (*spc).h_oversample as isize -1) as stbrp_coord;
-         (*rects.offset(k)).h = (y1-y0 + (*spc).padding as isize + (*spc).v_oversample as isize -1) as stbrp_coord;
+         (*rects.offset(k)).w = (x1-x0 + (*spc).padding as isize + (*spc).h_oversample as isize -1) as Coord;
+         (*rects.offset(k)).h = (y1-y0 + (*spc).padding as isize + (*spc).v_oversample as isize -1) as Coord;
          k += 1;
       }
    }
@@ -3359,15 +3336,13 @@ pub unsafe fn stbtt_PackFontRangesGatherRects(
 }
 
 // rects array must be big enough to accommodate all characters in the given ranges
-pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
-    spc: *mut stbtt_pack_context,
-    info: *mut stbtt_fontinfo,
-    ranges: *mut stbtt_pack_range,
+pub unsafe fn pack_font_ranges_render_into_rects(
+    spc: *mut PackContext,
+    info: *mut FontInfo,
+    ranges: *mut PackRange,
     num_ranges: isize,
-    rects: *mut stbrp_rect
+    rects: *mut Rect
 ) -> isize {
-   let i: isize;
-   let j: isize;
    let mut k: isize;
    let mut return_value: isize = 1;
 
@@ -3379,8 +3354,8 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
       let scale: f32 = if fh > 0.0 {
-            stbtt_ScaleForPixelHeight(info, fh)
-          } else { stbtt_ScaleForMappingEmToPixels(info, -fh) };
+            scale_for_pixel_height(info, fh)
+          } else { scale_for_mapping_em_to_pixels(info, -fh) };
       let recip_h: f32;
       let recip_v: f32;
       let sub_x: f32;
@@ -3389,12 +3364,12 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
       (*spc).v_oversample = (*ranges.offset(i)).v_oversample as usize;
       recip_h = 1.0 / (*spc).h_oversample as f32;
       recip_v = 1.0 / (*spc).v_oversample as f32;
-      sub_x = stbtt__oversample_shift((*spc).h_oversample as isize);
-      sub_y = stbtt__oversample_shift((*spc).v_oversample as isize);
+      sub_x = oversample_shift((*spc).h_oversample as isize);
+      sub_y = oversample_shift((*spc).v_oversample as isize);
       for j in 0..(*ranges.offset(i)).num_chars {
-         let r: *mut stbrp_rect = rects.offset(k);
-         if ((*r).was_packed != 0) {
-            let bc: *mut stbtt_packedchar = (*ranges.offset(i)).chardata_for_range.offset(j);
+         let r: *mut Rect = rects.offset(k);
+         if (*r).was_packed != 0 {
+            let bc: *mut PackedChar = (*ranges.offset(i)).chardata_for_range.offset(j);
             let mut advance: isize = 0;
             let mut lsb: isize = 0;
             let mut x0: isize = 0;
@@ -3407,20 +3382,20 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
                 } else {
                     (*(*ranges.offset(i)).array_of_unicode_codepoints.offset(j))
                 };
-            let glyph: isize = stbtt_FindGlyphIndex(info, codepoint);
-            let pad: stbrp_coord = (*spc).padding as stbrp_coord;
+            let glyph: isize = find_glyph_index(info, codepoint);
+            let pad: Coord = (*spc).padding as Coord;
 
             // pad on left and top
             (*r).x += pad;
             (*r).y += pad;
             (*r).w -= pad;
             (*r).h -= pad;
-            stbtt_GetGlyphHMetrics(info, glyph, &mut advance, &mut lsb);
-            stbtt_GetGlyphBitmapBox(info, glyph,
+            get_glyph_hmetrics(info, glyph, &mut advance, &mut lsb);
+            get_glyph_bitmap_box(info, glyph,
                                     scale * (*spc).h_oversample as f32,
                                     scale * (*spc).v_oversample as f32,
                                     &mut x0,&mut y0,&mut x1,&mut y1);
-            stbtt_MakeGlyphBitmapSubpixel(info,
+            make_glyph_bitmap_subpixel(info,
                                           (*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
                                           (*r).w - (*spc).h_oversample as isize +1,
                                           (*r).h - (*spc).v_oversample as isize +1,
@@ -3431,13 +3406,13 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
                                           glyph);
 
             if (*spc).h_oversample > 1 {
-               stbtt__h_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
+               h_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
                                   (*r).w, (*r).h, (*spc).stride_in_bytes,
                                   (*spc).h_oversample);
             }
 
             if (*spc).v_oversample > 1 {
-               stbtt__v_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
+               v_prefilter((*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
                                   (*r).w, (*r).h, (*spc).stride_in_bytes,
                                   (*spc).v_oversample);
             }
@@ -3466,32 +3441,32 @@ pub unsafe fn stbtt_PackFontRangesRenderIntoRects(
    return return_value;
 }
 
-pub unsafe fn stbtt_PackFontRangesPackRects(
-    spc: *mut stbtt_pack_context,
-    rects: *mut stbrp_rect,
+pub unsafe fn pack_font_ranges_pack_rects(
+    spc: *mut PackContext,
+    rects: *mut Rect,
     num_rects: isize)
 {
-   stbrp_pack_rects((*spc).pack_info as *mut stbrp_context, rects, num_rects);
+   stbrp_pack_rects((*spc).pack_info as *mut Context, rects, num_rects);
 }
 
 // Creates character bitmaps from multiple ranges of characters stored in
 // ranges. This will usually create a better-packed bitmap than multiple
 // calls to stbtt_PackFontRange. Note that you can call this multiple
 // times within a single PackBegin/PackEnd.
-pub unsafe fn stbtt_PackFontRanges(
-    spc: *mut stbtt_pack_context,
+pub unsafe fn pack_font_ranges(
+    spc: *mut PackContext,
     fontdata: *mut u8,
     font_index: isize,
-    ranges: *mut stbtt_pack_range,
+    ranges: *mut PackRange,
     num_ranges: isize
 ) -> isize
 {
-   let mut info: stbtt_fontinfo = stbtt_fontinfo {
+   let mut info: FontInfo = FontInfo {
       userdata: null(),
       // pointer to .ttf file
       data: null_mut(),
       fontstart: 0,
-      numGlyphs: 0,
+      num_glyphs: 0,
       loca: 0,
       head: 0,
       glyf: 0,
@@ -3499,14 +3474,11 @@ pub unsafe fn stbtt_PackFontRanges(
       hmtx: 0,
       kern: 0,
       index_map: 0,
-      indexToLocFormat: 0,
+      index_to_loc_format: 0,
    };
-   let i: isize;
-   let j: isize;
    let mut n: isize;
-   let mut return_value: isize = 1;
    //stbrp_context *context = (stbrp_context *) spc->pack_info;
-   let rects: *mut stbrp_rect;
+   let rects: *mut Rect;
 
    // flag all characters as NOT packed
    for i in 0..num_ranges {
@@ -3523,19 +3495,19 @@ pub unsafe fn stbtt_PackFontRanges(
       n += (*ranges.offset(i)).num_chars;
    }
 
-   rects = STBTT_malloc!(size_of::<stbrp_rect>() * n as usize)
-        as *mut stbrp_rect;
+   rects = STBTT_malloc!(size_of::<Rect>() * n as usize)
+        as *mut Rect;
    if rects == null_mut() {
       return 0;
    }
 
-   stbtt_InitFont(&mut info, fontdata, stbtt_GetFontOffsetForIndex(fontdata,font_index) as isize);
+   init_font(&mut info, fontdata, get_font_offset_for_index(fontdata,font_index) as isize);
 
-   n = stbtt_PackFontRangesGatherRects(spc, &mut info, ranges, num_ranges, rects);
+   n = pack_font_ranges_gather_rects(spc, &mut info, ranges, num_ranges, rects);
 
-   stbtt_PackFontRangesPackRects(spc, rects, n);
+   pack_font_ranges_pack_rects(spc, rects, n);
 
-   return_value = stbtt_PackFontRangesRenderIntoRects(spc, &mut info, ranges, num_ranges, rects);
+   let return_value = pack_font_ranges_render_into_rects(spc, &mut info, ranges, num_ranges, rects);
 
    STBTT_free!(rects as *mut c_void);
    return return_value;
@@ -3553,16 +3525,16 @@ pub unsafe fn stbtt_PackFontRanges(
 // and pass that result as 'font_size':
 //       ...,                  20 , ... // font max minus min y is 20 pixels tall
 //       ..., STBTT_POINT_SIZE(20), ... // 'M' is 20 pixels tall
-pub unsafe fn stbtt_PackFontRange(
-    spc: *mut stbtt_pack_context,
+pub unsafe fn pack_font_range(
+    spc: *mut PackContext,
     fontdata: *mut u8,
     font_index: isize,
     font_size: f32,
     first_unicode_codepoint_in_range: isize,
     num_chars_in_range: isize,
-    chardata_for_range: *mut stbtt_packedchar
+    chardata_for_range: *mut PackedChar
 ) -> isize {
-   let mut range: stbtt_pack_range = stbtt_pack_range {
+   let mut range: PackRange = PackRange {
        first_unicode_codepoint_in_range: first_unicode_codepoint_in_range,
        array_of_unicode_codepoints: null(),
        num_chars: num_chars_in_range,
@@ -3571,11 +3543,11 @@ pub unsafe fn stbtt_PackFontRange(
        v_oversample: 0,
        h_oversample: 0,
    };
-   return stbtt_PackFontRanges(spc, fontdata, font_index, &mut range, 1);
+   return pack_font_ranges(spc, fontdata, font_index, &mut range, 1);
 }
 
-pub unsafe fn stbtt_GetPackedQuad(
-    chardata: *mut stbtt_packedchar,
+pub unsafe fn get_packed_quad(
+    chardata: *mut PackedChar,
     pw: isize,
     ph: isize,
     // character to display
@@ -3584,14 +3556,14 @@ pub unsafe fn stbtt_GetPackedQuad(
     xpos: *mut f32,
     ypos: *mut f32,
     // output: quad to draw
-    q: *mut stbtt_aligned_quad,
+    q: *mut AlignedQuad,
     align_to_integer: isize
 ) {
    let ipw: f32 = 1.0 / pw as f32;
    let iph: f32 = 1.0 / ph as f32;
-   let b: *const stbtt_packedchar = chardata.offset(char_index);
+   let b: *const PackedChar = chardata.offset(char_index);
 
-   if (align_to_integer != 0) {
+   if align_to_integer != 0 {
       let x: f32 = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5) as f32;
       let y: f32 = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5) as f32;
       (*q).x0 = x;
@@ -3620,18 +3592,18 @@ pub unsafe fn stbtt_GetPackedQuad(
 //
 
 // check if a utf8 string contains a prefix which is the utf16 string; if so return length of matching utf8 string
-pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
-    s1: *const stbtt_uint8,
-    len1: stbtt_int32,
-    mut s2: *const stbtt_uint8,
-    mut len2: stbtt_int32
-) -> stbtt_int32 {
-   let mut i: stbtt_int32 =0;
+pub unsafe fn compare_utf8_to_utf16_bigendian_prefix(
+    s1: *const u8,
+    len1: i32,
+    mut s2: *const u8,
+    mut len2: i32
+) -> i32 {
+   let mut i: i32 =0;
 
    // convert utf16 to utf8 and compare the results while converting
-   while (len2 != 0) {
-      let ch: stbtt_uint16 = (*s2.offset(0)*256 + *s2.offset(1)) as u16;
-      if (ch < 0x80) {
+   while len2 != 0 {
+      let ch: u16 = *s2.offset(0) as u16 *256 + *s2.offset(1) as u16;
+      if ch < 0x80 {
          if i >= len1 { return -1; }
          if *s1.offset(i as isize) != ch as u8 { return -1; }
          i += 1;
@@ -3639,13 +3611,13 @@ pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
          if i+1 >= len1 { return -1; }
          if *s1.offset(i as isize) != (0xc0 + (ch >> 6)) as u8 { return -1; }
          i += 1;
-         if (*s1.offset(i as isize) != (0x80 + (ch & 0x3f)) as u8) { return -1; }
+         if *s1.offset(i as isize) != (0x80 + (ch & 0x3f)) as u8 { return -1; }
          i += 1;
-      } else if (ch >= 0xd800 && ch < 0xdc00) {
-         let c: stbtt_uint32;
-         let ch2: stbtt_uint16 = (*s2.offset(2)*256 + *s2.offset(3)) as u16;
+      } else if ch >= 0xd800 && ch < 0xdc00 {
+         let c: u32;
+         let ch2: u16 = *s2.offset(2) as u16 *256 + *s2.offset(3) as u16;
          if i+3 >= len1 { return -1; }
-         c = (((ch - 0xd800) << 10) + (ch2 - 0xdc00) + 0x10000) as u32;
+         c = ((ch - 0xd800) << 10) as u32 + (ch2 - 0xdc00) as u32 + 0x10000;
          if *s1.offset(i as isize) != (0xf0 + (c >> 18)) as u8 { return -1; }
          i += 1;
          if *s1.offset(i as isize) != (0x80 + ((c >> 12) & 0x3f)) as u8 { return -1; }
@@ -3656,7 +3628,7 @@ pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
          i += 1;
          s2 = s2.offset(2); // plus another 2 below
          len2 -= 2;
-      } else if (ch >= 0xdc00 && ch < 0xe000) {
+      } else if ch >= 0xdc00 && ch < 0xe000 {
          return -1;
       } else {
          if i+2 >= len1 { return -1; }
@@ -3675,14 +3647,14 @@ pub unsafe fn stbtt__CompareUTF8toUTF16_bigendian_prefix(
 
 // returns 1/0 whether the first string interpreted as utf8 is identical to
 // the second string interpreted as big-endian utf16... useful for strings from next func
-pub unsafe fn stbtt_CompareUTF8toUTF16_bigendian(
+pub unsafe fn compare_utf8_to_utf16_bigendian(
     s1: *const u8,
     len1: isize,
     s2: *const u8,
     len2: isize
 ) -> isize {
-   return (len1 == stbtt__CompareUTF8toUTF16_bigendian_prefix(
-       s1 as *const stbtt_uint8, len1 as i32, s2 as *const stbtt_uint8, len2 as i32) as isize) as isize;
+   return (len1 == compare_utf8_to_utf16_bigendian_prefix(
+       s1 as *const u8, len1 as i32, s2 as *const u8, len2 as i32) as isize) as isize;
 }
 
 // returns the string (which may be big-endian double byte, e.g. for unicode)
@@ -3694,81 +3666,79 @@ pub unsafe fn stbtt_CompareUTF8toUTF16_bigendian(
 //
 // returns results in whatever encoding you request... but note that 2-byte encodings
 // will be BIG-ENDIAN... use stbtt_CompareUTF8toUTF16_bigendian() to compare
-pub unsafe fn stbtt_GetFontNameString(
-    font: *const stbtt_fontinfo,
+pub unsafe fn get_font_name_string(
+    font: *const FontInfo,
     length: *mut isize,
-    platformID: isize,
-    encodingID: isize,
-    languageID: isize,
-    nameID: isize
+    platform_id: isize,
+    encoding_id: isize,
+    language_id: isize,
+    name_id: isize
 ) -> *const u8 {
-   let i: stbtt_int32;
-   let count: stbtt_int32;
-   let stringOffset: stbtt_int32;
-   let fc: *const stbtt_uint8 = (*font).data;
-   let offset: stbtt_uint32 = (*font).fontstart as u32;
-   let nm: stbtt_uint32 = stbtt__find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   let count: i32;
+   let string_offset: i32;
+   let fc: *const u8 = (*font).data;
+   let offset: u32 = (*font).fontstart as u32;
+   let nm: u32 = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
    if nm == 0 { return null(); }
 
    count = ttUSHORT!(fc.offset(nm as isize +2)) as i32;
-   stringOffset = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
+   string_offset = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
    for i in 0..count as u32 {
-      let loc: stbtt_uint32 = nm + 6 + 12 * i;
-      if (platformID == ttUSHORT!(fc.offset(loc as isize +0)) as isize && encodingID == ttUSHORT!(fc.offset(loc as isize +2)) as isize
-          && languageID == ttUSHORT!(fc.offset(loc as isize +4)) as isize && nameID == ttUSHORT!(fc.offset(loc as isize +6)) as isize) {
+      let loc: u32 = nm + 6 + 12 * i;
+      if platform_id == ttUSHORT!(fc.offset(loc as isize +0)) as isize && encoding_id == ttUSHORT!(fc.offset(loc as isize +2)) as isize
+          && language_id == ttUSHORT!(fc.offset(loc as isize +4)) as isize && name_id == ttUSHORT!(fc.offset(loc as isize +6)) as isize {
          *length = ttUSHORT!(fc.offset(loc as isize +8)) as isize;
-         return (fc.offset(stringOffset as isize +ttUSHORT!(fc.offset(loc as isize +10)) as isize)) as *const u8;
+         return (fc.offset(string_offset as isize +ttUSHORT!(fc.offset(loc as isize +10)) as isize)) as *const u8;
       }
    }
    return null();
 }
 
-pub unsafe fn stbtt__matchpair(
-    fc: *mut stbtt_uint8,
-    nm: stbtt_uint32,
-    name: *mut stbtt_uint8,
-    nlen: stbtt_int32,
-    target_id: stbtt_int32,
-    next_id: stbtt_int32
+pub unsafe fn matchpair(
+    fc: *mut u8,
+    nm: u32,
+    name: *mut u8,
+    nlen: i32,
+    target_id: i32,
+    next_id: i32
 ) -> isize {
-    let i: stbtt_int32;
-    let count: stbtt_uint32 = ttUSHORT!(fc.offset(nm as isize +2)) as u32;
-    let stringOffset: stbtt_int32 = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
+    let count: u32 = ttUSHORT!(fc.offset(nm as isize +2)) as u32;
+    let string_offset: i32 = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
 
    for i in 0..count as u32 {
-      let loc: stbtt_uint32 = nm + 6 + 12 * i;
-      let id: stbtt_int32 = ttUSHORT!(fc.offset(loc as isize +6)) as i32;
+      let loc: u32 = nm + 6 + 12 * i;
+      let id: i32 = ttUSHORT!(fc.offset(loc as isize +6)) as i32;
       if id == target_id {
          // find the encoding
-         let platform: stbtt_int32 = ttUSHORT!(fc.offset(loc as isize +0)) as i32;
-         let encoding: stbtt_int32 = ttUSHORT!(fc.offset(loc as isize +2)) as i32;
-         let language: stbtt_int32 = ttUSHORT!(fc.offset(loc as isize +4)) as i32;
+         let platform: i32 = ttUSHORT!(fc.offset(loc as isize +0)) as i32;
+         let encoding: i32 = ttUSHORT!(fc.offset(loc as isize +2)) as i32;
+         let language: i32 = ttUSHORT!(fc.offset(loc as isize +4)) as i32;
 
          // is this a Unicode encoding?
-         if (platform == 0 || (platform == 3 && encoding == 1) || (platform == 3 && encoding == 10)) {
-            let mut slen: stbtt_int32 = ttUSHORT!(fc.offset(loc as isize +8)) as i32;
-            let mut off: stbtt_int32 = ttUSHORT!(fc.offset(loc as isize +10)) as i32;
+         if platform == 0 || (platform == 3 && encoding == 1) || (platform == 3 && encoding == 10) {
+            let mut slen: i32 = ttUSHORT!(fc.offset(loc as isize +8)) as i32;
+            let mut off: i32 = ttUSHORT!(fc.offset(loc as isize +10)) as i32;
 
             // check if there's a prefix match
-            let mut matchlen: stbtt_int32 = stbtt__CompareUTF8toUTF16_bigendian_prefix(
-                name, nlen, fc.offset(stringOffset as isize + off as isize),slen);
-            if (matchlen >= 0) {
+            let mut matchlen: i32 = compare_utf8_to_utf16_bigendian_prefix(
+                name, nlen, fc.offset(string_offset as isize + off as isize),slen);
+            if matchlen >= 0 {
                // check for target_id+1 immediately following, with same encoding & language
-               if (i+1 < count && ttUSHORT!(fc.offset(loc as isize +12+6)) == next_id as u16
+               if i+1 < count && ttUSHORT!(fc.offset(loc as isize +12+6)) == next_id as u16
                && ttUSHORT!(fc.offset(loc as isize +12)) == platform as u16
                && ttUSHORT!(fc.offset(loc as isize +12+2)) == encoding as u16
-               && ttUSHORT!(fc.offset(loc as isize +12+4)) == language as u16) {
+               && ttUSHORT!(fc.offset(loc as isize +12+4)) == language as u16 {
                   slen = ttUSHORT!(fc.offset(loc as isize +12+8)) as i32;
                   off = ttUSHORT!(fc.offset(loc as isize +12+10)) as i32;
-                  if (slen == 0) {
+                  if slen == 0 {
                      if matchlen == nlen {
                         return 1;
                      }
-                  } else if (matchlen < nlen && *name.offset(matchlen as isize) == ' ' as u8) {
+                  } else if matchlen < nlen && *name.offset(matchlen as isize) == ' ' as u8 {
                      matchlen += 1;
-                     if (stbtt_CompareUTF8toUTF16_bigendian(
+                     if compare_utf8_to_utf16_bigendian(
                          (name.offset(matchlen as isize)) as *mut u8, (nlen - matchlen) as isize,
-                         (fc.offset(stringOffset as isize + off as isize)) as *mut u8,slen as isize) != 0) {
+                         (fc.offset(string_offset as isize + off as isize)) as *mut u8,slen as isize) != 0 {
                         return 1;
                     }
                   }
@@ -3787,35 +3757,35 @@ pub unsafe fn stbtt__matchpair(
    return 0;
 }
 
-pub unsafe fn stbtt__matches(
-    fc: *mut stbtt_uint8,
-    offset: stbtt_uint32,
-    name: *mut stbtt_uint8,
-    flags: stbtt_int32
+pub unsafe fn matches(
+    fc: *mut u8,
+    offset: u32,
+    name: *mut u8,
+    flags: i32
 ) -> isize {
-    let nlen: stbtt_int32 = STBTT_strlen(name as *mut c_char) as stbtt_int32;
-    let nm: stbtt_uint32;
-    let hd: stbtt_uint32;
-   if (stbtt__isfont(fc.offset(offset as isize)) == 0) { return 0; }
+    let nlen: i32 = STBTT_strlen(name as *mut c_char) as i32;
+    let nm: u32;
+    let hd: u32;
+   if isfont(fc.offset(offset as isize)) == 0 { return 0; }
 
    // check italics/bold/underline flags in macStyle...
-   if (flags != 0) {
-      hd = stbtt__find_table(fc, offset, CString::new("head").unwrap().as_ptr());
-      if ((ttUSHORT!(fc.offset(hd as isize + 44)) & 7) != (flags as u16 & 7)) { return 0; }
+   if flags != 0 {
+      hd = find_table(fc, offset, CString::new("head").unwrap().as_ptr());
+      if (ttUSHORT!(fc.offset(hd as isize + 44)) & 7) != (flags as u16 & 7) { return 0; }
    }
 
-   nm = stbtt__find_table(fc, offset, CString::new("name").unwrap().as_ptr());
-   if (nm == 0) { return 0; }
+   nm = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   if nm == 0 { return 0; }
 
-   if (flags != 0) {
+   if flags != 0 {
       // if we checked the macStyle flags, then just check the family and ignore the subfamily
-      if (stbtt__matchpair(fc, nm, name, nlen, 16, -1) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  1, -1) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
+      if matchpair(fc, nm, name, nlen, 16, -1) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  1, -1) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  3, -1) != 0 { return 1; }
    } else {
-      if (stbtt__matchpair(fc, nm, name, nlen, 16, 17) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  1,  2) != 0) { return 1; }
-      if (stbtt__matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
+      if matchpair(fc, nm, name, nlen, 16, 17) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  1,  2) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  3, -1) != 0 { return 1; }
    }
 
    return 0;
@@ -3825,17 +3795,16 @@ pub unsafe fn stbtt__matches(
 //   if you use STBTT_MACSTYLE_DONTCARE, use a font name like "Arial Bold".
 //   if you use any other flag, use a font name like "Arial"; this checks
 //     the 'macStyle' header field; i don't know if fonts set this consistently
-pub unsafe fn stbtt_FindMatchingFont(
+pub unsafe fn find_matching_font(
     font_collection: *const u8,
     name_utf8: *const u8,
-    flags: stbtt_int32
+    flags: i32
 ) -> i32 {
-   let i: stbtt_int32;
    for i in 0.. {
-      let off: stbtt_int32 = stbtt_GetFontOffsetForIndex(font_collection, i);
+      let off: i32 = get_font_offset_for_index(font_collection, i);
       if off < 0 { return off; }
-      if (stbtt__matches(font_collection as *mut stbtt_uint8,
-            off as stbtt_uint32, name_utf8 as *mut stbtt_uint8, flags) != 0) {
+      if matches(font_collection as *mut u8,
+            off as u32, name_utf8 as *mut u8, flags) != 0 {
          return off;
       }
    }
@@ -3864,7 +3833,7 @@ pub unsafe fn stbtt_FindMatchingFont(
 //                        non-oversampled; STBTT_POINT_SIZE for packed case only
 //   1.00 (2014-12-06) add new PackBegin etc. API, w/ support for oversampling
 //   0.99 (2014-09-18) fix multiple bugs with subpixel rendering (ryg)
-//   0.9  (2014-08-07) support certain mac/iOS fonts without an MS platformID
+//   0.9  (2014-08-07) support certain mac/iOS fonts without an MS platform_id
 //   0.8b (2014-07-07) fix a warning
 //   0.8  (2014-05-25) fix a few more warnings
 //   0.7  (2013-09-25) bugfix: subpixel glyph bug fixed in 0.5 had come back

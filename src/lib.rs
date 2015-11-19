@@ -2425,26 +2425,26 @@ pub unsafe fn stbtt__rasterize(
       m += *wcount.offset(i);
       j = *wcount.offset(i)-1;
       for k in 0..(*wcount.offset(i)) {
-          if k != 0 { j = k; }
          let mut a: isize=k;
          let mut b: isize =j;
          // skip the edge if horizontal
-         if (*p.offset(j)).y == (*p.offset(k)).y {
-            continue;
+         if (*p.offset(j)).y != (*p.offset(k)).y {
+            // add edge from j to k to the list
+            (*e.offset(n)).invert = 0;
+            if if invert != 0 { (*p.offset(j)).y > (*p.offset(k)).y }
+               else { (*p.offset(j)).y < (*p.offset(k)).y } {
+               (*e.offset(n)).invert = 1;
+               a=j;
+               b=k;
+            }
+            (*e.offset(n)).x0 = (*p.offset(a)).x * scale_x + shift_x;
+            (*e.offset(n)).y0 = ((*p.offset(a)).y * y_scale_inv + shift_y) * vsubsample as f32;
+            (*e.offset(n)).x1 = (*p.offset(b)).x * scale_x + shift_x;
+            (*e.offset(n)).y1 = ((*p.offset(b)).y * y_scale_inv + shift_y) * vsubsample as f32;
+
+            n += 1;
          }
-         // add edge from j to k to the list
-         (*e.offset(n)).invert = 0;
-         if if invert != 0 { (*p.offset(j)).y > (*p.offset(k)).y }
-            else { (*p.offset(j)).y < (*p.offset(k)).y } {
-            (*e.offset(n)).invert = 1;
-            a=j;
-            b=k;
-         }
-         (*e.offset(n)).x0 = (*p.offset(a)).x * scale_x + shift_x;
-         (*e.offset(n)).y0 = ((*p.offset(a)).y * y_scale_inv + shift_y) * vsubsample as f32;
-         (*e.offset(n)).x1 = (*p.offset(b)).x * scale_x + shift_x;
-         (*e.offset(n)).y1 = ((*p.offset(b)).y * y_scale_inv + shift_y) * vsubsample as f32;
-         n += 1;
+         j = k;
       }
    }
 

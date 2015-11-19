@@ -319,8 +319,16 @@ use std::ptr::copy as STBTT_memcpy;
 
 //   #define STBTT_memcpy       memcpy
 
-use libc::memchr as STBTT_memset;
 //   #define STBTT_memset       memset
+
+fn STBTT_memset(buf: *mut c_void, b: u8, count: usize) {
+    let buf = buf as *mut u8;
+    for idx in 0..count {
+        unsafe {
+            *buf.offset(idx as isize) = b;
+        }
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -2198,8 +2206,8 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
       // Coped from location B because could not find declaration.
       let z: *mut stbtt__active_edge = *step;
 
-      STBTT_memset(scanline as *const c_void, 0, (*result).w as usize * size_of::<f32>());
-      STBTT_memset(scanline2 as *const c_void, 0,
+      STBTT_memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
+      STBTT_memset(scanline2 as *mut c_void, 0,
           ((*result).w+1) as usize * size_of::<f32>());
 
       // update all active edges;
@@ -2878,7 +2886,7 @@ pub unsafe fn stbtt_BakeFontBitmap(
     if stbtt_InitFont(&mut f, data, offset) == 0 {
          return -1;
     }
-   STBTT_memset(pixels as *const _ as *const c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+   STBTT_memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    x=1;
    y=1;
    bottom_y = 1;
@@ -3116,7 +3124,7 @@ pub unsafe fn stbtt_PackBegin(
    stbrp_init_target(context, pw-padding, ph-padding, nodes, num_nodes);
 
    if pixels != null_mut() {
-      STBTT_memset(pixels as *const c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+      STBTT_memset(pixels as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    }
 
    return 1;
@@ -3173,7 +3181,7 @@ pub unsafe fn stbtt__h_prefilter(
    for j in 0..h {
       let i: isize;
       let mut total: usize;
-      STBTT_memset(&buffer[0] as *const _ as *const c_void, 0, kernel_width);
+      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 
@@ -3239,7 +3247,7 @@ pub unsafe fn stbtt__v_prefilter(
    for j in 0..w {
       let i: isize;
       let mut total: usize;
-      STBTT_memset(&buffer[0] as *const _ as *const c_void, 0, kernel_width);
+      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 

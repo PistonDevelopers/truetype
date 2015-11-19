@@ -498,9 +498,9 @@ pub enum STBTT_cmd {
   vcurve=3
 }
 
-type stbtt_vertex_type = i16;
+type VertexType = i16;
 #[derive(Copy, Clone)]
-pub struct stbtt_vertex {
+pub struct Vertex {
    x: i16,
    y: i16,
    cx: i16,
@@ -510,7 +510,7 @@ pub struct stbtt_vertex {
 }
 
 // @TODO: don't expose this structure
-pub struct stbtt__bitmap
+pub struct Bitmap
 {
     w: isize,
     h: isize,
@@ -977,13 +977,13 @@ pub unsafe fn find_glyph_index(
 pub unsafe fn get_codepoint_shape(
     info: *const stbtt_fontinfo,
     unicode_codepoint: isize,
-     vertices: *mut *mut stbtt_vertex
+     vertices: *mut *mut Vertex
 ) -> isize {
    return get_glyph_shape(info, find_glyph_index(info, unicode_codepoint), vertices);
 }
 
 pub unsafe fn stbtt_setvertex(
-    v: *mut stbtt_vertex,
+    v: *mut Vertex,
     type_: STBTT_cmd,
     x: stbtt_int32,
     y: stbtt_int32,
@@ -1062,7 +1062,7 @@ pub unsafe fn is_glyph_empty(
 }
 
 pub unsafe fn close_shape(
-    vertices: *mut stbtt_vertex,
+    vertices: *mut Vertex,
     mut num_vertices: isize,
     was_off: isize,
     start_off: isize,
@@ -1105,12 +1105,12 @@ pub unsafe fn close_shape(
 pub unsafe fn get_glyph_shape(
     info: *const stbtt_fontinfo,
     glyph_index: isize,
-    pvertices: *mut *mut stbtt_vertex
+    pvertices: *mut *mut Vertex
 ) -> isize {
    let number_of_contours: stbtt_int16;
    let end_pts_of_contours: *mut stbtt_uint8;
    let data: *mut stbtt_uint8 = (*info).data;
-   let mut vertices: *mut stbtt_vertex=null_mut();
+   let mut vertices: *mut Vertex=null_mut();
    let mut num_vertices: isize =0;
    let g: isize = get_glyph_offset(info, glyph_index);
 
@@ -1147,7 +1147,7 @@ pub unsafe fn get_glyph_shape(
       n = 1+ttUSHORT!(end_pts_of_contours.offset(number_of_contours as isize *2-2)) as i32;
 
       m = n + 2*number_of_contours as i32;  // a loose bound on how many vertices we might need
-      vertices = STBTT_malloc!(m as usize * size_of::<stbtt_vertex>()) as *mut stbtt_vertex;
+      vertices = STBTT_malloc!(m as usize * size_of::<Vertex>()) as *mut Vertex;
       if vertices == null_mut() {
          return 0;
       }
@@ -1286,8 +1286,8 @@ pub unsafe fn get_glyph_shape(
          let flags: stbtt_uint16;
          let gidx: stbtt_uint16;
          let comp_num_verts: isize;
-         let mut comp_verts: *mut stbtt_vertex = null_mut();
-         let tmp: *mut stbtt_vertex;
+         let mut comp_verts: *mut Vertex = null_mut();
+         let tmp: *mut Vertex;
          let mut mtx: [f32; 6] = [1.0,0.0,0.0,1.0,0.0,0.0];
          let m: f32;
          let n: f32;
@@ -1335,19 +1335,19 @@ pub unsafe fn get_glyph_shape(
          if (comp_num_verts > 0) {
             // Transform vertices.
             for i in 0..comp_num_verts {
-               let v: *mut stbtt_vertex = comp_verts.offset(i);
-               let mut x: stbtt_vertex_type;
-               let mut y: stbtt_vertex_type;
+               let v: *mut Vertex = comp_verts.offset(i);
+               let mut x: VertexType;
+               let mut y: VertexType;
                x=(*v).x; y=(*v).y;
-               (*v).x = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as stbtt_vertex_type;
-               (*v).y = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as stbtt_vertex_type;
+               (*v).x = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as VertexType;
+               (*v).y = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as VertexType;
                x=(*v).cx; y=(*v).cy;
-               (*v).cx = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as stbtt_vertex_type;
-               (*v).cy = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as stbtt_vertex_type;
+               (*v).cx = (m as f32 * (mtx[0]*x as f32 + mtx[2]*y as f32 + mtx[4])) as VertexType;
+               (*v).cy = (n as f32 * (mtx[1]*x as f32 + mtx[3]*y as f32 + mtx[5])) as VertexType;
             }
             // Append vertices.
-            tmp = STBTT_malloc!((num_vertices+comp_num_verts) as usize *size_of::<stbtt_vertex>())
-                as *mut stbtt_vertex;
+            tmp = STBTT_malloc!((num_vertices+comp_num_verts) as usize *size_of::<Vertex>())
+                as *mut Vertex;
             if tmp == null_mut() {
                if vertices != null_mut() { STBTT_free!(vertices as *mut c_void); }
                if comp_verts != null_mut() { STBTT_free!(comp_verts as *mut c_void); }
@@ -1355,10 +1355,10 @@ pub unsafe fn get_glyph_shape(
             }
             if (num_vertices > 0) {
                 STBTT_memcpy(tmp, vertices,
-                    num_vertices as usize *size_of::<stbtt_vertex>());
+                    num_vertices as usize *size_of::<Vertex>());
             }
             STBTT_memcpy(tmp.offset(num_vertices), comp_verts,
-                comp_num_verts as usize *size_of::<stbtt_vertex>());
+                comp_num_verts as usize *size_of::<Vertex>());
             if vertices != null_mut() { STBTT_free!(vertices as *mut c_void); }
             vertices = tmp;
             STBTT_free!(comp_verts as *mut c_void);
@@ -1537,7 +1537,7 @@ pub unsafe fn scale_for_mapping_em_to_pixels(
 //
 // BITMAP RENDERING
 //
-pub unsafe fn free_shape(_info: *const stbtt_fontinfo, v: *mut stbtt_vertex)
+pub unsafe fn free_shape(_info: *const stbtt_fontinfo, v: *mut Vertex)
 {
    STBTT_free!(v as *mut c_void);
 }
@@ -2152,7 +2152,7 @@ pub unsafe fn fill_active_edges_new(
 
 // directly AA rasterize edges w/o supersampling
 pub unsafe fn rasterize_sorted_edges(
-    result: *mut stbtt__bitmap,
+    result: *mut Bitmap,
     mut e: *mut Edge,
     n: isize,
     _vsubsample: isize,
@@ -2373,7 +2373,7 @@ pub struct Point
 }
 
 unsafe fn rasterize_(
-    result: *mut stbtt__bitmap,
+    result: *mut Bitmap,
     pts: *mut Point,
     wcount: *mut isize,
     windings: isize,
@@ -2496,7 +2496,7 @@ pub unsafe fn tesselate_curve(
 
 // returns number of contours
 pub unsafe fn flatten_curves(
-    vertices: *mut stbtt_vertex,
+    vertices: *mut Vertex,
     num_verts: isize,
     objspace_flatness: f32,
     contour_lengths: *mut *mut isize,
@@ -2587,11 +2587,11 @@ pub unsafe fn flatten_curves(
 // rasterize a shape with quadratic beziers into a bitmap
 pub unsafe fn rasterize(
     // 1-channel bitmap to draw into
-    result: *mut stbtt__bitmap,
+    result: *mut Bitmap,
     // allowable error of curve in pixels
     flatness_in_pixels: f32,
     // array of vertices defining shape
-    vertices: *mut stbtt_vertex,
+    vertices: *mut Vertex,
     // number of vertices in above array
     num_verts: isize,
     // scale applied to input vertices
@@ -2643,7 +2643,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
    let mut iy0: isize = 0;
    let mut ix1: isize = 0;
    let mut iy1: isize = 0;
-   let mut vertices: *mut stbtt_vertex = null_mut();
+   let mut vertices: *mut Vertex = null_mut();
    let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
    if scale_x == 0.0 { scale_x = scale_y; }
@@ -2656,7 +2656,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
        shift_x, shift_y, &mut ix0,&mut iy0,&mut ix1,&mut iy1);
 
    // now we get the size
-   let mut gbm = stbtt__bitmap
+   let mut gbm = Bitmap
    {
        w: (ix1 - ix0),
        h: (iy1 - iy0),
@@ -2714,12 +2714,12 @@ pub unsafe fn make_glyph_bitmap_subpixel(
 ) {
    let mut ix0: isize = 0;
    let mut iy0: isize = 0;
-   let mut vertices: *mut stbtt_vertex = null_mut();
+   let mut vertices: *mut Vertex = null_mut();
    let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
    get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
        shift_x, shift_y, &mut ix0,&mut iy0,null_mut(),null_mut());
-   let mut gbm: stbtt__bitmap = stbtt__bitmap
+   let mut gbm: Bitmap = Bitmap
    {
        w: out_w,
        h: out_h,

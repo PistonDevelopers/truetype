@@ -2377,7 +2377,7 @@ pub struct Point
    y: f32,
 }
 
-pub unsafe fn stbtt__rasterize(
+unsafe fn rasterize_(
     result: *mut stbtt__bitmap,
     pts: *mut Point,
     wcount: *mut isize,
@@ -2621,7 +2621,7 @@ pub unsafe fn rasterize(
    let windings: *mut Point = flatten_curves(vertices, num_verts,
        flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count, userdata);
    if windings != null_mut() {
-      stbtt__rasterize(result, windings, winding_lengths, winding_count,
+      rasterize_(result, windings, winding_lengths, winding_count,
           scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert, userdata);
       STBTT_free!(winding_lengths as *mut c_void);
       STBTT_free!(windings as *mut c_void);

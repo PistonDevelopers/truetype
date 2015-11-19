@@ -564,6 +564,7 @@ impl From<u16> for STBTT_PLATFORM_ID {
     }
 }
 
+/*
 enum STBTT_UNICODE_EID { // encoding_id for STBTT_PLATFORM_ID_UNICODE
    UNICODE_1_0    =0,
    UNICODE_1_1    =1,
@@ -571,6 +572,7 @@ enum STBTT_UNICODE_EID { // encoding_id for STBTT_PLATFORM_ID_UNICODE
    UNICODE_2_0_BMP=3,
    UNICODE_2_0_FULL=4
 }
+*/
 
 enum MsEid { // encoding_id for STBTT_PLATFORM_ID_MICROSOFT
    Symbol        =0,

@@ -1637,10 +1637,10 @@ pub struct stbtt__hheap
    num_remaining_in_head_chunk: isize,
 }
 
-pub unsafe fn stbtt__hheap_alloc(
+pub unsafe fn hheap_alloc(
     hh: *mut stbtt__hheap,
     size: size_t,
-    userdata: *const ()
+    _userdata: *const ()
 ) -> *const () {
    if (*hh).first_free != null_mut() {
       let p: *mut () = (*hh).first_free;
@@ -1669,12 +1669,12 @@ pub unsafe fn stbtt__hheap_alloc(
    }
 }
 
-pub unsafe fn stbtt__hheap_free(hh: *mut stbtt__hheap, p: *mut ()) {
+pub unsafe fn hheap_free(hh: *mut stbtt__hheap, p: *mut ()) {
    *(p as *mut *mut ()) = (*hh).first_free;
    (*hh).first_free = p;
 }
 
-pub unsafe fn stbtt__hheap_cleanup(hh: *mut stbtt__hheap, userdata: *const ()) {
+pub unsafe fn hheap_cleanup(hh: *mut stbtt__hheap, _userdata: *const ()) {
    let mut c: *mut stbtt__hheap_chunk = (*hh).head;
    while c != null_mut() {
       let n: *mut stbtt__hheap_chunk = (*c).next;
@@ -1747,7 +1747,7 @@ pub unsafe fn new_active(
     start_point: f32,
     userdata: *const ()
 ) -> *mut ActiveEdge {
-   let z: *mut ActiveEdge = stbtt__hheap_alloc(
+   let z: *mut ActiveEdge = hheap_alloc(
        hh, size_of::<ActiveEdge>(), userdata)
         as *mut ActiveEdge;
    let dxdy: f32 = ((*e).x1 - (*e).x0) / ((*e).y1 - (*e).y0);
@@ -2198,7 +2198,7 @@ pub unsafe fn rasterize_sorted_edges(
             *step = (*z).next; // delete from list
             STBTT_assert!((*z).direction != 0.0);
             (*z).direction = 0.0;
-            stbtt__hheap_free(&mut hh, z as *mut ());
+            hheap_free(&mut hh, z as *mut ());
          } else {
             step = &mut ((**step).next); // advance through list
          }
@@ -2248,7 +2248,7 @@ pub unsafe fn rasterize_sorted_edges(
       j += 1;
    }
 
-   stbtt__hheap_cleanup(&mut hh, userdata);
+   hheap_cleanup(&mut hh, userdata);
 
    if scanline != scanline_data.as_mut_ptr() {
       STBTT_free!(scanline as *mut c_void);

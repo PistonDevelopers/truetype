@@ -1692,8 +1692,8 @@ pub struct stbtt__edge {
    invert: isize,
 }
 
-pub struct stbtt__active_edge {
-   next: *mut stbtt__active_edge,
+pub struct ActiveEdge {
+   next: *mut ActiveEdge,
    // TODO: Conditional compilation.
    // #if STBTT_RASTERIZER_VERSION==1
    // int x,dx;
@@ -1746,10 +1746,10 @@ pub unsafe fn new_active(
     off_x: isize,
     start_point: f32,
     userdata: *const ()
-) -> *mut stbtt__active_edge {
-   let z: *mut stbtt__active_edge = stbtt__hheap_alloc(
-       hh, size_of::<stbtt__active_edge>(), userdata)
-        as *mut stbtt__active_edge;
+) -> *mut ActiveEdge {
+   let z: *mut ActiveEdge = stbtt__hheap_alloc(
+       hh, size_of::<ActiveEdge>(), userdata)
+        as *mut ActiveEdge;
    let dxdy: f32 = ((*e).x1 - (*e).x0) / ((*e).y1 - (*e).y0);
    //STBTT_assert(e->y0 <= start_point);
    if z == null_mut() { return z; }
@@ -1920,7 +1920,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
 pub unsafe fn handle_clipped_edge(
     scanline: *mut f32,
     x: isize,
-    e: *mut stbtt__active_edge,
+    e: *mut ActiveEdge,
     mut x0: f32,
     mut y0: f32,
     mut x1: f32,
@@ -1970,7 +1970,7 @@ pub unsafe fn fill_active_edges_new(
     scanline: *mut f32,
     scanline_fill: *mut f32,
     len: isize,
-    mut e: *mut stbtt__active_edge,
+    mut e: *mut ActiveEdge,
     y_top: f32
 ) {
    let y_bottom: f32 = y_top+1.0;
@@ -2161,7 +2161,7 @@ pub unsafe fn rasterize_sorted_edges(
       first_free: null_mut(),
       num_remaining_in_head_chunk: 0,
    };
-   let mut active: *mut stbtt__active_edge = null_mut();
+   let mut active: *mut ActiveEdge = null_mut();
    let mut y: isize;
    let mut j: isize =0;
    let mut scanline_data: [f32; 129] = [0.0; 129];
@@ -2183,7 +2183,7 @@ pub unsafe fn rasterize_sorted_edges(
       // find center of pixel for this scanline
       let scan_y_top: f32 = y as f32 + 0.0;
       let scan_y_bottom: f32 = y as f32 + 1.0;
-      let mut step: *mut *mut stbtt__active_edge = &mut active;
+      let mut step: *mut *mut ActiveEdge = &mut active;
 
       STBTT_memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
       STBTT_memset(scanline2 as *mut c_void, 0,
@@ -2193,7 +2193,7 @@ pub unsafe fn rasterize_sorted_edges(
       // remove all active edges that terminate before the top of this scanline
       while (*step) != null_mut() {
           // Location B.
-          let z: *mut stbtt__active_edge = *step;
+          let z: *mut ActiveEdge = *step;
          if ((*z).ey <= scan_y_top) {
             *step = (*z).next; // delete from list
             STBTT_assert!((*z).direction != 0.0);
@@ -2207,7 +2207,7 @@ pub unsafe fn rasterize_sorted_edges(
       // insert all edges that start before the bottom of this scanline
       while ((*e).y0 <= scan_y_bottom) {
          if ((*e).y0 != (*e).y1) {
-            let z: *mut stbtt__active_edge = new_active(
+            let z: *mut ActiveEdge = new_active(
                 &mut hh, e, off_x, scan_y_top, userdata);
             STBTT_assert!((*z).ey >= scan_y_top);
             // insert at front
@@ -2239,7 +2239,7 @@ pub unsafe fn rasterize_sorted_edges(
       // advance all the edges
       step = &mut active;
       while *step != null_mut() {
-         let z: *mut stbtt__active_edge = *step;
+         let z: *mut ActiveEdge = *step;
          (*z).fx += (*z).fdx; // advance to position for current scanline
          step = &mut ((**step).next); // advance through list
       }

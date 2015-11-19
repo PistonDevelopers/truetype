@@ -1684,7 +1684,7 @@ pub unsafe fn stbtt__hheap_cleanup(hh: *mut stbtt__hheap, userdata: *const ()) {
 }
 
 #[derive(Copy, Clone)]
-pub struct stbtt__edge {
+pub struct Edge {
     x0: f32,
     y0: f32,
     x1: f32,
@@ -1742,7 +1742,7 @@ static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, i
 // #elif STBTT_RASTERIZER_VERSION == 2
 pub unsafe fn new_active(
     hh: *mut stbtt__hheap,
-    e: *mut stbtt__edge,
+    e: *mut Edge,
     off_x: isize,
     start_point: f32,
     userdata: *const ()
@@ -2149,7 +2149,7 @@ pub unsafe fn fill_active_edges_new(
 // directly AA rasterize edges w/o supersampling
 pub unsafe fn rasterize_sorted_edges(
     result: *mut stbtt__bitmap,
-    mut e: *mut stbtt__edge,
+    mut e: *mut Edge,
     n: isize,
     _vsubsample: isize,
     off_x: isize,
@@ -2267,16 +2267,16 @@ macro_rules! STBTT__COMPARE {
 // #define STBTT__COMPARE(a,b)  ((a)->y0 < (b)->y0)
 
 pub unsafe fn sort_edges_ins_sort(
-    p: *mut stbtt__edge,
+    p: *mut Edge,
     n: isize
 ) {
    let mut j: isize;
    for i in 1..n {
-      let t: stbtt__edge = *p.offset(i);
-      let a: *const stbtt__edge = &t;
+      let t: Edge = *p.offset(i);
+      let a: *const Edge = &t;
       j = i;
       while (j > 0) {
-         let b: *const stbtt__edge = p.offset(j-1);
+         let b: *const Edge = p.offset(j-1);
          let c = STBTT__COMPARE!((*a),(*b));
          if !c { break; }
          (*p.offset(j)) = (*p.offset(j-1));
@@ -2288,11 +2288,11 @@ pub unsafe fn sort_edges_ins_sort(
    }
 }
 
-pub unsafe fn sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
+pub unsafe fn sort_edges_quicksort(mut p: *mut Edge, mut n: isize)
 {
    /* threshhold for transitioning to insertion sort */
    while (n > 12) {
-      let mut t: stbtt__edge;
+      let mut t: Edge;
       let c01: bool;
       let c12: bool;
       let c: bool;
@@ -2357,7 +2357,7 @@ pub unsafe fn sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
    }
 }
 
-pub unsafe fn sort_edges(p: *mut stbtt__edge, n: isize) {
+pub unsafe fn sort_edges(p: *mut Edge, n: isize) {
    sort_edges_quicksort(p, n);
    sort_edges_ins_sort(p, n);
 }
@@ -2383,7 +2383,7 @@ unsafe fn rasterize_(
     userdata: *const ()
 ) {
    let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
-   let e: *mut stbtt__edge;
+   let e: *mut Edge;
    let mut n: isize;
    let mut j: isize;
    let mut m: isize;
@@ -2403,8 +2403,8 @@ unsafe fn rasterize_(
       n = n + *wcount.offset(i);
    }
 
-   e = STBTT_malloc!(size_of::<stbtt__edge>() * (n+1) as usize)
-        as *mut stbtt__edge; // add an extra one as a sentinel
+   e = STBTT_malloc!(size_of::<Edge>() * (n+1) as usize)
+        as *mut Edge; // add an extra one as a sentinel
    if e == null_mut() { return };
    n = 0;
 

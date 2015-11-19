@@ -1118,7 +1118,6 @@ pub unsafe fn get_glyph_shape(
       let mut flags: stbtt_uint8 =0;
       let mut flagcount: stbtt_uint8;
       let ins: stbtt_int32;
-      let i: stbtt_int32;
       let mut j: stbtt_int32 =0;
       let m: stbtt_int32;
       let n: stbtt_int32;
@@ -1280,10 +1279,9 @@ pub unsafe fn get_glyph_shape(
       while more != 0 {
          let flags: stbtt_uint16;
          let gidx: stbtt_uint16;
-         let mut comp_num_verts: isize = 0;
-         let i: isize;
+         let comp_num_verts: isize;
          let mut comp_verts: *mut stbtt_vertex = null_mut();
-         let mut tmp: *mut stbtt_vertex = null_mut();
+         let tmp: *mut stbtt_vertex;
          let mut mtx: [f32; 6] = [1.0,0.0,0.0,1.0,0.0,0.0];
          let m: f32;
          let n: f32;

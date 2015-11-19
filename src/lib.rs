@@ -1630,7 +1630,7 @@ struct stbtt__hheap_chunk {
    next: *mut stbtt__hheap_chunk
 }
 
-pub struct stbtt__hheap
+pub struct Hheap
 {
    head: *mut stbtt__hheap_chunk,
    first_free: *mut (),
@@ -1638,7 +1638,7 @@ pub struct stbtt__hheap
 }
 
 pub unsafe fn hheap_alloc(
-    hh: *mut stbtt__hheap,
+    hh: *mut Hheap,
     size: size_t,
     _userdata: *const ()
 ) -> *const () {
@@ -1669,12 +1669,12 @@ pub unsafe fn hheap_alloc(
    }
 }
 
-pub unsafe fn hheap_free(hh: *mut stbtt__hheap, p: *mut ()) {
+pub unsafe fn hheap_free(hh: *mut Hheap, p: *mut ()) {
    *(p as *mut *mut ()) = (*hh).first_free;
    (*hh).first_free = p;
 }
 
-pub unsafe fn hheap_cleanup(hh: *mut stbtt__hheap, _userdata: *const ()) {
+pub unsafe fn hheap_cleanup(hh: *mut Hheap, _userdata: *const ()) {
    let mut c: *mut stbtt__hheap_chunk = (*hh).head;
    while c != null_mut() {
       let n: *mut stbtt__hheap_chunk = (*c).next;
@@ -1741,7 +1741,7 @@ static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, i
 */
 // #elif STBTT_RASTERIZER_VERSION == 2
 pub unsafe fn new_active(
-    hh: *mut stbtt__hheap,
+    hh: *mut Hheap,
     e: *mut Edge,
     off_x: isize,
     start_point: f32,
@@ -2156,7 +2156,7 @@ pub unsafe fn rasterize_sorted_edges(
     off_y: isize,
     userdata: *const ()
 ) {
-   let mut hh: stbtt__hheap = stbtt__hheap {
+   let mut hh: Hheap = Hheap {
       head: null_mut(),
       first_free: null_mut(),
       num_remaining_in_head_chunk: 0,

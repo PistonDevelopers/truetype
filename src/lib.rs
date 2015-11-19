@@ -241,11 +241,14 @@
 ////   The following sections allow you to supply alternate definitions
 ////   of C library functions used by stb_truetype.
 
+extern crate byteorder;
 extern crate libc;
 
 use std::ptr::{ null, null_mut };
 use std::mem::size_of;
 use std::ffi::CString;
+use std::slice;
+use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
 
 pub type stbtt_uint8 = u8;
@@ -316,8 +319,16 @@ use std::ptr::copy as STBTT_memcpy;
 
 //   #define STBTT_memcpy       memcpy
 
-use libc::memchr as STBTT_memset;
 //   #define STBTT_memset       memset
+
+fn STBTT_memset(buf: *mut c_void, b: u8, count: usize) {
+    let buf = buf as *mut u8;
+    for idx in 0..count {
+        unsafe {
+            *buf.offset(idx as isize) = b;
+        }
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -439,6 +450,32 @@ pub struct stbtt_fontinfo {
    indexToLocFormat: isize,
 }
 
+impl stbtt_fontinfo {
+    pub fn uninitialized() -> stbtt_fontinfo {
+        stbtt_fontinfo{
+            userdata: null(),
+           // pointer to .ttf file
+           data: null_mut(),
+           // offset of start of font
+           fontstart: 0,
+           // number of glyphs, needed for range checking
+           numGlyphs: 0,
+
+           // table locations as offset from start of .ttf
+           loca: 0,
+           head: 0,
+           glyf: 0,
+           hhea: 0,
+           hmtx: 0,
+           kern: 0,
+           // a cmap mapping for our chosen character encoding
+           index_map: 0,
+           // format needed to map from glyph index to glyph
+           indexToLocFormat: 0,
+        }
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // CHARACTER TO GLYPH-INDEX CONVERSIOn
@@ -461,17 +498,6 @@ pub enum STBTT_cmd {
   vcurve=3
 }
 
-impl From<u8> for STBTT_cmd {
-    fn from(val: u8) -> STBTT_cmd {
-        match val {
-            1 => STBTT_cmd::vmove,
-            2 => STBTT_cmd::vline,
-            3 => STBTT_cmd::vcurve,
-            _ => panic!("Unknown STBTT_cmd")
-        }
-    }
-}
-
 type stbtt_vertex_type = i16;
 #[derive(Copy, Clone)]
 pub struct stbtt_vertex {
@@ -480,7 +506,7 @@ pub struct stbtt_vertex {
    cx: i16,
    cy: i16,
    type_: STBTT_cmd,
-   padding: u8,
+   flags: u8,
 }
 
 // @TODO: don't expose this structure
@@ -634,45 +660,27 @@ macro_rules! ttCHAR {
 
 macro_rules! ttUSHORT {
     ($p:expr) => {
-        *($p as *const stbtt_uint16)
+        BigEndian::read_u16(slice::from_raw_parts($p, 2))
     }
 }
 
 macro_rules! ttSHORT {
     ($p:expr) => {
-        *($p as *const stbtt_int16)
+        BigEndian::read_i16(slice::from_raw_parts($p, 2))
     }
 }
 
 macro_rules! ttULONG {
     ($p:expr) => {
-        *($p as *const stbtt_uint32)
+        BigEndian::read_u32(slice::from_raw_parts($p, 4))
     }
 }
 
 macro_rules! ttLONG {
     ($p:expr) => {
-        *($p as *const stbtt_int32)
+        BigEndian::read_i32(slice::from_raw_parts($p, 4))
     }
 }
-
-/* TODO: Endian conversion.
-#if defined(STB_TRUETYPE_BIGENDIAN) && !defined(ALLOW_UNALIGNED_TRUETYPE)
-
-   #define ttUSHORT(p)   (* (stbtt_uint16 *) (p))
-   #define ttSHORT(p)    (* (stbtt_int16 *) (p))
-   #define ttULONG(p)    (* (stbtt_uint32 *) (p))
-   #define ttLONG(p)     (* (stbtt_int32 *) (p))
-
-#else
-
-   static stbtt_uint16 ttUSHORT(const stbtt_uint8 *p) { return p[0]*256 + p[1]; }
-   static stbtt_int16 ttSHORT(const stbtt_uint8 *p)   { return p[0]*256 + p[1]; }
-   static stbtt_uint32 ttULONG(const stbtt_uint8 *p)  { return (p[0]<<24) + (p[1]<<16) + (p[2]<<8) + p[3]; }
-   static stbtt_int32 ttLONG(const stbtt_uint8 *p)    { return (p[0]<<24) + (p[1]<<16) + (p[2]<<8) + p[3]; }
-
-#endif
-*/
 
 macro_rules! stbtt_tag4 {
     ($p:expr, $c0:expr, $c1:expr, $c2:expr, $c3:expr) => {
@@ -1161,20 +1169,19 @@ pub unsafe fn stbtt_GetGlyphShape(
          } else {
             flagcount -= 1;
          }
-         (*vertices.offset(off as isize +i as isize)).type_ = flags.into();
+         (*vertices.offset(off as isize +i as isize)).flags = flags;
       }
-
       // now load x coordinates
       x=0;
       for i in 0..n {
-         flags = (*vertices.offset(off as isize +i as isize)).type_ as u8;
+         flags = (*vertices.offset(off as isize + i as isize)).flags;
          if (flags & 2) != 0 {
             let dx: stbtt_int16 = *points as i16;
             points = points.offset(1);
             x += if (flags & 16) != 0 { dx as i32 } else { -dx as i32 }; // ???
          } else {
             if (flags & 16) == 0 {
-               x = x + (*points*256 + *points.offset(1)) as i32;
+               x = x + BigEndian::read_i16(slice::from_raw_parts(points, 2)) as i32;
                points = points.offset(2);
             }
          }
@@ -1184,14 +1191,14 @@ pub unsafe fn stbtt_GetGlyphShape(
       // now load y coordinates
       y=0;
       for i in 0..n {
-         flags = (*vertices.offset(off as isize +i as isize)).type_ as u8;
+         flags = (*vertices.offset(off as isize + i as isize)).flags;
          if (flags & 4) != 0 {
             let dy: stbtt_int16 = *points as i16;
             points = points.offset(1);
             y += if (flags & 32) != 0 { dy as i32 } else { -dy as i32 }; // ???
          } else {
             if (flags & 32) == 0 {
-               y = y + (*points.offset(0)*256 + *points.offset(1)) as i32;
+               y = y + BigEndian::read_i16(slice::from_raw_parts(points, 2)) as i32;
                points = points.offset(2);
             }
          }
@@ -1206,10 +1213,9 @@ pub unsafe fn stbtt_GetGlyphShape(
       let mut i_iter = (0..n).into_iter();
       let mut i = 0;
       while { if let Some(v) = i_iter.next() { i = v; true } else { false } } {
-         flags = (*vertices.offset(off as isize +i as isize)).type_ as u8;
+         flags = (*vertices.offset(off as isize +i as isize)).flags;
          x     = (*vertices.offset(off as isize +i as isize)).x as i32;
          y     = (*vertices.offset(off as isize +i as isize)).y as i32;
-
          if (next_move == i) {
             if (i != 0) {
                num_vertices = stbtt__close_shape(vertices,
@@ -1217,7 +1223,7 @@ pub unsafe fn stbtt_GetGlyphShape(
             }
 
             // now start the new one
-            start_off = !(flags & 1) as i32;
+            start_off = (1 - (flags & 1)) as i32;
             if start_off != 0 {
                // if we start off with an off-curve point, then when we need to find a point on the curve
                // where we can start, and we need to save some state for when we wraparound.
@@ -2187,8 +2193,8 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
       // Coped from location B because could not find declaration.
       let z: *mut stbtt__active_edge = *step;
 
-      STBTT_memset(scanline as *const c_void, 0, (*result).w as usize * size_of::<f32>());
-      STBTT_memset(scanline2 as *const c_void, 0,
+      STBTT_memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
+      STBTT_memset(scanline2 as *mut c_void, 0,
           ((*result).w+1) as usize * size_of::<f32>());
 
       // update all active edges;
@@ -2281,9 +2287,9 @@ pub unsafe fn stbtt__sort_edges_ins_sort(
       while (j > 0) {
          let b: *const stbtt__edge = p.offset(j-1);
          let c = STBTT__COMPARE!((*a),(*b));
-         if c { break; }
+         if !c { break; }
          (*p.offset(j)) = (*p.offset(j-1));
-         --j;
+         j -= 1;
       }
       if i != j {
          (*p.offset(j)) = t;
@@ -2369,6 +2375,87 @@ pub struct Point
 {
    x: f32,
    y: f32,
+}
+
+pub unsafe fn stbtt__rasterize(
+    result: *mut stbtt__bitmap,
+    pts: *mut Point,
+    wcount: *mut isize,
+    windings: isize,
+    scale_x: f32,
+    scale_y: f32,
+    shift_x: f32,
+    shift_y: f32,
+    off_x: isize,
+    off_y: isize,
+    invert: isize,
+    userdata: *const ()
+) {
+   let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
+   let e: *mut stbtt__edge;
+   let mut n: isize;
+   let i: isize;
+   let mut j: isize;
+   let k: isize;
+   let mut m: isize;
+// TODO: Conditional compilation.
+// #if STBTT_RASTERIZER_VERSION == 1
+//    int vsubsample = result->h < 8 ? 15 : 5;
+// #elif STBTT_RASTERIZER_VERSION == 2
+   let vsubsample: isize = 1;
+// #else
+//   #error "Unrecognized value of STBTT_RASTERIZER_VERSION"
+// #endif
+   // vsubsample should divide 255 evenly; otherwise we won't reach full opacity
+
+   // now we have to blow out the windings into explicit edge lists
+   n = 0;
+   for i in 0..windings {
+      n = n + *wcount.offset(i);
+   }
+
+   e = STBTT_malloc!(size_of::<stbtt__edge>() * (n+1) as usize)
+        as *mut stbtt__edge; // add an extra one as a sentinel
+   if e == null_mut() { return };
+   n = 0;
+
+   m=0;
+   for i in 0..windings {
+      let p: *const Point = pts.offset(m);
+      m += *wcount.offset(i);
+      j = *wcount.offset(i)-1;
+      for k in 0..(*wcount.offset(i)) {
+         let mut a: isize=k;
+         let mut b: isize =j;
+         // skip the edge if horizontal
+         if (*p.offset(j)).y != (*p.offset(k)).y {
+            // add edge from j to k to the list
+            (*e.offset(n)).invert = 0;
+            if if invert != 0 { (*p.offset(j)).y > (*p.offset(k)).y }
+               else { (*p.offset(j)).y < (*p.offset(k)).y } {
+               (*e.offset(n)).invert = 1;
+               a=j;
+               b=k;
+            }
+            (*e.offset(n)).x0 = (*p.offset(a)).x * scale_x + shift_x;
+            (*e.offset(n)).y0 = ((*p.offset(a)).y * y_scale_inv + shift_y) * vsubsample as f32;
+            (*e.offset(n)).x1 = (*p.offset(b)).x * scale_x + shift_x;
+            (*e.offset(n)).y1 = ((*p.offset(b)).y * y_scale_inv + shift_y) * vsubsample as f32;
+
+            n += 1;
+         }
+         j = k;
+      }
+   }
+
+   // now sort the edges by their highest point (should snap to integer, and then by x)
+   //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
+   stbtt__sort_edges(e, n);
+
+   // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
+   stbtt__rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
+
+   STBTT_free!(e as *mut c_void);
 }
 
 pub unsafe fn add_point(
@@ -2528,87 +2615,6 @@ pub unsafe fn rasterize(
     // context for to STBTT_MALLOC
     userdata: *const ()
 ) {
-
-    #[allow(non_snake_case)]
-    unsafe fn stbtt__rasterize(
-        result: *mut stbtt__bitmap,
-        pts: *mut Point,
-        wcount: *mut isize,
-        windings: isize,
-        scale_x: f32,
-        scale_y: f32,
-        shift_x: f32,
-        shift_y: f32,
-        off_x: isize,
-        off_y: isize,
-        invert: isize,
-        userdata: *const ()
-    ) {
-       let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
-       let e: *mut stbtt__edge;
-       let mut n: isize;
-       let mut j: isize;
-       let mut m: isize;
-    // TODO: Conditional compilation.
-    // #if STBTT_RASTERIZER_VERSION == 1
-    //    int vsubsample = result->h < 8 ? 15 : 5;
-    // #elif STBTT_RASTERIZER_VERSION == 2
-       let vsubsample: isize = 1;
-    // #else
-    //   #error "Unrecognized value of STBTT_RASTERIZER_VERSION"
-    // #endif
-       // vsubsample should divide 255 evenly; otherwise we won't reach full opacity
-
-       // now we have to blow out the windings into explicit edge lists
-       n = 0;
-       for i in 0..windings {
-          n = n + *wcount.offset(i);
-       }
-
-       e = STBTT_malloc!(size_of::<stbtt__edge>() * (n+1) as usize)
-            as *mut stbtt__edge; // add an extra one as a sentinel
-       if e == null_mut() { return };
-       n = 0;
-
-       m=0;
-       for i in 0..windings {
-          let p: *const Point = pts.offset(m);
-          m += *wcount.offset(i);
-          j = *wcount.offset(i)-1;
-          for k in 0..(*wcount.offset(i)) {
-              if k != 0 { j = k; }
-             let mut a: isize=k;
-             let mut b: isize =j;
-             // skip the edge if horizontal
-             if (*p.offset(j)).y == (*p.offset(k)).y {
-                continue;
-             }
-             // add edge from j to k to the list
-             (*e.offset(n)).invert = 0;
-             if if invert != 0 { (*p.offset(j)).y > (*p.offset(k)).y }
-                else { (*p.offset(j)).y < (*p.offset(k)).y } {
-                (*e.offset(n)).invert = 1;
-                a=j;
-                b=k;
-             }
-             (*e.offset(n)).x0 = (*p.offset(a)).x * scale_x + shift_x;
-             (*e.offset(n)).y0 = ((*p.offset(a)).y * y_scale_inv + shift_y) * vsubsample as f32;
-             (*e.offset(n)).x1 = (*p.offset(b)).x * scale_x + shift_x;
-             (*e.offset(n)).y1 = ((*p.offset(b)).y * y_scale_inv + shift_y) * vsubsample as f32;
-             n += 1;
-          }
-       }
-
-       // now sort the edges by their highest point (should snap to integer, and then by x)
-       //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
-       stbtt__sort_edges(e, n);
-
-       // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
-       stbtt__rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
-
-       STBTT_free!(e as *mut c_void);
-    }
-
    let scale: f32 = if scale_x > scale_y { scale_y } else { scale_x };
    let mut winding_count: isize = 0;
    let mut winding_lengths: *mut isize = null_mut();
@@ -2863,7 +2869,7 @@ pub unsafe fn bake_font_bitmap(
     if stbtt_InitFont(&mut f, data, offset) == 0 {
          return -1;
     }
-   STBTT_memset(pixels as *const _ as *const c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+   STBTT_memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    x=1;
    y=1;
    bottom_y = 1;
@@ -3102,7 +3108,7 @@ pub unsafe fn pack_begin(
    stbrp_init_target(context, pw-padding, ph-padding, nodes, num_nodes);
 
    if pixels != null_mut() {
-      STBTT_memset(pixels as *const c_void, 0, (pw*ph) as usize); // background of 0 around pixels
+      STBTT_memset(pixels as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    }
 
    return 1;
@@ -3157,7 +3163,7 @@ pub unsafe fn h_prefilter(
    let safe_w: isize = w - kernel_width as isize;
    for _ in 0..h {
       let mut total: usize;
-      STBTT_memset(&buffer[0] as *const _ as *const c_void, 0, kernel_width);
+      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 
@@ -3221,7 +3227,7 @@ pub unsafe fn v_prefilter(
    let safe_h: isize = h - kernel_width as isize;
    for _ in 0..w {
       let mut total: usize;
-      STBTT_memset(&buffer[0] as *const _ as *const c_void, 0, kernel_width);
+      STBTT_memset(&mut buffer[0] as *mut _ as *mut c_void, 0, kernel_width);
 
       total = 0;
 

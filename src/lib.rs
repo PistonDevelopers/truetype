@@ -422,7 +422,6 @@ pub struct PackContext {
 // The following structure is defined publically so you can declare one on
 // the stack or as a global or etc, but you should treat it as opaque.
 pub struct FontInfo {
-   userdata: *const (),
    // pointer to .ttf file
    data: *mut u8,
    // offset of start of font
@@ -446,7 +445,6 @@ pub struct FontInfo {
 impl FontInfo {
     pub fn uninitialized() -> FontInfo {
         FontInfo{
-            userdata: null(),
            // pointer to .ttf file
            data: null_mut(),
            // offset of start of font
@@ -1636,8 +1634,7 @@ pub struct Hheap
 
 pub unsafe fn hheap_alloc(
     hh: *mut Hheap,
-    size: size_t,
-    _userdata: *const ()
+    size: size_t
 ) -> *const () {
    if (*hh).first_free != null_mut() {
       let p: *mut () = (*hh).first_free;
@@ -1671,7 +1668,7 @@ pub unsafe fn hheap_free(hh: *mut Hheap, p: *mut ()) {
    (*hh).first_free = p;
 }
 
-pub unsafe fn hheap_cleanup(hh: *mut Hheap, _userdata: *const ()) {
+pub unsafe fn hheap_cleanup(hh: *mut Hheap) {
    let mut c: *mut HheapChunk = (*hh).head;
    while c != null_mut() {
       let n: *mut HheapChunk = (*c).next;
@@ -1715,9 +1712,9 @@ pub struct ActiveEdge {
 // #define STBTT_FIXMASK    (STBTT_FIX-1)
 
 /*
-static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, int off_x, float start_point, void *userdata)
+static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, int off_x, float start_point)
 {
-   stbtt__active_edge *z = (stbtt__active_edge *) stbtt__hheap_alloc(hh, sizeof(*z), userdata);
+   stbtt__active_edge *z = (stbtt__active_edge *) stbtt__hheap_alloc(hh, sizeof(*z));
    float dxdy = (e->x1 - e->x0) / (e->y1 - e->y0);
    if (!z) return z;
 
@@ -1741,11 +1738,10 @@ pub unsafe fn new_active(
     hh: *mut Hheap,
     e: *mut Edge,
     off_x: isize,
-    start_point: f32,
-    userdata: *const ()
+    start_point: f32
 ) -> *mut ActiveEdge {
    let z: *mut ActiveEdge = hheap_alloc(
-       hh, size_of::<ActiveEdge>(), userdata)
+       hh, size_of::<ActiveEdge>())
         as *mut ActiveEdge;
    let dxdy: f32 = ((*e).x1 - (*e).x0) / ((*e).y1 - (*e).y0);
    //STBTT_assert(e->y0 <= start_point);
@@ -1812,7 +1808,7 @@ static void stbtt__fill_active_edges(unsigned char *scanline, int len, stbtt__ac
    }
 }
 
-static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e, int n, int vsubsample, int off_x, int off_y, void *userdata)
+static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e, int n, int vsubsample, int off_x, int off_y)
 {
    stbtt__hheap hh = { 0, 0, 0 };
    stbtt__active_edge *active = NULL;
@@ -1822,7 +1818,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
    unsigned char scanline_data[512], *scanline;
 
    if (result->w > 512)
-      scanline = (unsigned char *) STBTT_malloc(result->w, userdata);
+      scanline = (unsigned char *) STBTT_malloc(result->w);
    else
       scanline = scanline_data;
 
@@ -1873,7 +1869,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
          // insert all edges that start before the center of this scanline -- omit ones that also end on this scanline
          while (e->y0 <= scan_y) {
             if (e->y1 > scan_y) {
-               stbtt__active_edge *z = stbtt__new_active(&hh, e, off_x, scan_y, userdata);
+               stbtt__active_edge *z = stbtt__new_active(&hh, e, off_x, scan_y);
                // find insertion point
                if (active == NULL)
                   active = z;
@@ -1904,10 +1900,10 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
       ++j;
    }
 
-   stbtt__hheap_cleanup(&hh, userdata);
+   stbtt__hheap_cleanup(&hh);
 
    if (scanline != scanline_data)
-      STBTT_free(scanline, userdata);
+      STBTT_free(scanline);
 }
 */
 // #elif STBTT_RASTERIZER_VERSION == 2
@@ -2150,8 +2146,7 @@ pub unsafe fn rasterize_sorted_edges(
     n: isize,
     _vsubsample: isize,
     off_x: isize,
-    off_y: isize,
-    userdata: *const ()
+    off_y: isize
 ) {
    let mut hh: Hheap = Hheap {
       head: null_mut(),
@@ -2205,7 +2200,7 @@ pub unsafe fn rasterize_sorted_edges(
       while (*e).y0 <= scan_y_bottom {
          if (*e).y0 != (*e).y1 {
             let z: *mut ActiveEdge = new_active(
-                &mut hh, e, off_x, scan_y_top, userdata);
+                &mut hh, e, off_x, scan_y_top);
             STBTT_assert!((*z).ey >= scan_y_top);
             // insert at front
             (*z).next = active;
@@ -2245,7 +2240,7 @@ pub unsafe fn rasterize_sorted_edges(
       j += 1;
    }
 
-   hheap_cleanup(&mut hh, userdata);
+   hheap_cleanup(&mut hh);
 
    if scanline != scanline_data.as_mut_ptr() {
       STBTT_free!(scanline as *mut c_void);
@@ -2376,8 +2371,7 @@ unsafe fn rasterize_(
     shift_y: f32,
     off_x: isize,
     off_y: isize,
-    invert: isize,
-    userdata: *const ()
+    invert: isize
 ) {
    let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
    let e: *mut Edge;
@@ -2439,7 +2433,7 @@ unsafe fn rasterize_(
    sort_edges(e, n);
 
    // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
-   rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
+   rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y);
 
    STBTT_free!(e as *mut c_void);
 }
@@ -2494,7 +2488,6 @@ pub unsafe fn flatten_curves(
     objspace_flatness: f32,
     contour_lengths: *mut *mut isize,
     num_contours: *mut isize,
-    _userdata: *const ()
 ) -> *mut Point {
     let mut points: *mut Point = null_mut();
     let mut num_points: isize =0;
@@ -2597,25 +2590,23 @@ pub unsafe fn rasterize(
     x_off: isize,
     y_off: isize,
     // if non-zero, vertically flip shape
-    invert: isize,
-    // context for to STBTT_MALLOC
-    userdata: *const ()
+    invert: isize
 ) {
    let scale: f32 = if scale_x > scale_y { scale_y } else { scale_x };
    let mut winding_count: isize = 0;
    let mut winding_lengths: *mut isize = null_mut();
    let windings: *mut Point = flatten_curves(vertices, num_verts,
-       flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count, userdata);
+       flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count);
    if windings != null_mut() {
       rasterize_(result, windings, winding_lengths, winding_count,
-          scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert, userdata);
+          scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert);
       STBTT_free!(winding_lengths as *mut c_void);
       STBTT_free!(windings as *mut c_void);
    }
 }
 
 // frees the bitmap allocated below
-pub unsafe fn free_bitmap(bitmap: *mut u8, _userdata: *const ())
+pub unsafe fn free_bitmap(bitmap: *mut u8)
 {
    STBTT_free!(bitmap as *mut c_void);
 }
@@ -2669,7 +2660,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
 
          rasterize(&mut gbm, 0.35,
              vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0, iy0,
-              1, (*info).userdata);
+              1);
       }
    }
    STBTT_free!(vertices as *mut c_void);
@@ -2722,7 +2713,7 @@ pub unsafe fn make_glyph_bitmap_subpixel(
 
    if gbm.w != 0 && gbm.h != 0 {
       rasterize(&mut gbm, 0.35, vertices, num_verts,
-          scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1, (*info).userdata);
+          scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1);
    }
 
    STBTT_free!(vertices as *mut c_void);
@@ -2839,7 +2830,6 @@ pub unsafe fn bake_font_bitmap(
     let mut y: isize;
     let mut bottom_y: isize;
     let mut f: FontInfo = FontInfo {
-       userdata: null(),
        data: null_mut(),
        fontstart: 0,
        num_glyphs: 0,
@@ -3462,7 +3452,6 @@ pub unsafe fn pack_font_ranges(
 ) -> isize
 {
    let mut info: FontInfo = FontInfo {
-      userdata: null(),
       // pointer to .ttf file
       data: null_mut(),
       fontstart: 0,

@@ -1966,7 +1966,7 @@ pub unsafe fn stbtt__handle_clipped_edge(
    }
 }
 
-pub unsafe fn stbtt__fill_active_edges_new(
+pub unsafe fn fill_active_edges_new(
     scanline: *mut f32,
     scanline_fill: *mut f32,
     len: isize,
@@ -2091,7 +2091,6 @@ pub unsafe fn stbtt__fill_active_edges_new(
             // clipping logic. since this does not match the intended use
             // of this library, we use a different, very slow brute
             // force implementation
-            let x: isize;
             for x in 0..len {
                // cases:
                //
@@ -2152,11 +2151,11 @@ pub unsafe fn stbtt__fill_active_edges_new(
 }
 
 // directly AA rasterize edges w/o supersampling
-pub unsafe fn stbtt__rasterize_sorted_edges(
+pub unsafe fn rasterize_sorted_edges(
     result: *mut stbtt__bitmap,
     mut e: *mut stbtt__edge,
     n: isize,
-    vsubsample: isize,
+    _vsubsample: isize,
     off_x: isize,
     off_y: isize,
     userdata: *const ()
@@ -2169,7 +2168,6 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
    let mut active: *mut stbtt__active_edge = null_mut();
    let mut y: isize;
    let mut j: isize =0;
-   let i: isize;
    let mut scanline_data: [f32; 129] = [0.0; 129];
    let scanline: *mut f32;
    let scanline2: *mut f32;
@@ -2190,8 +2188,6 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
       let scan_y_top: f32 = y as f32 + 0.0;
       let scan_y_bottom: f32 = y as f32 + 1.0;
       let mut step: *mut *mut stbtt__active_edge = &mut active;
-      // Coped from location B because could not find declaration.
-      let z: *mut stbtt__active_edge = *step;
 
       STBTT_memset(scanline as *mut c_void, 0, (*result).w as usize * size_of::<f32>());
       STBTT_memset(scanline2 as *mut c_void, 0,
@@ -2227,7 +2223,7 @@ pub unsafe fn stbtt__rasterize_sorted_edges(
 
       // now process all active edges
       if active != null_mut() {
-         stbtt__fill_active_edges_new(scanline, scanline2.offset(1), (*result).w,
+         fill_active_edges_new(scanline, scanline2.offset(1), (*result).w,
             active, scan_y_top);
       }
 
@@ -2274,11 +2270,10 @@ macro_rules! STBTT__COMPARE {
 
 // #define STBTT__COMPARE(a,b)  ((a)->y0 < (b)->y0)
 
-pub unsafe fn stbtt__sort_edges_ins_sort(
+pub unsafe fn sort_edges_ins_sort(
     p: *mut stbtt__edge,
     n: isize
 ) {
-   let i: isize;
    let mut j: isize;
    for i in 1..n {
       let t: stbtt__edge = *p.offset(i);
@@ -2297,7 +2292,7 @@ pub unsafe fn stbtt__sort_edges_ins_sort(
    }
 }
 
-pub unsafe fn stbtt__sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
+pub unsafe fn sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
 {
    /* threshhold for transitioning to insertion sort */
    while (n > 12) {
@@ -2356,19 +2351,19 @@ pub unsafe fn stbtt__sort_edges_quicksort(mut p: *mut stbtt__edge, mut n: isize)
       }
       /* recurse on smaller side, iterate on larger */
       if (j < (n-i)) {
-         stbtt__sort_edges_quicksort(p,j);
+         sort_edges_quicksort(p,j);
          p = p.offset(i);
          n = n-i;
       } else {
-         stbtt__sort_edges_quicksort(p.offset(i), n-i);
+         sort_edges_quicksort(p.offset(i), n-i);
          n = j;
       }
    }
 }
 
-pub unsafe fn stbtt__sort_edges(p: *mut stbtt__edge, n: isize) {
-   stbtt__sort_edges_quicksort(p, n);
-   stbtt__sort_edges_ins_sort(p, n);
+pub unsafe fn sort_edges(p: *mut stbtt__edge, n: isize) {
+   sort_edges_quicksort(p, n);
+   sort_edges_ins_sort(p, n);
 }
 
 pub struct Point
@@ -2394,9 +2389,7 @@ unsafe fn rasterize_(
    let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
    let e: *mut stbtt__edge;
    let mut n: isize;
-   let i: isize;
    let mut j: isize;
-   let k: isize;
    let mut m: isize;
 // TODO: Conditional compilation.
 // #if STBTT_RASTERIZER_VERSION == 1
@@ -2450,10 +2443,10 @@ unsafe fn rasterize_(
 
    // now sort the edges by their highest point (should snap to integer, and then by x)
    //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
-   stbtt__sort_edges(e, n);
+   sort_edges(e, n);
 
    // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
-   stbtt__rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
+   rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
 
    STBTT_free!(e as *mut c_void);
 }

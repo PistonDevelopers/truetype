@@ -2287,9 +2287,9 @@ pub unsafe fn stbtt__sort_edges_ins_sort(
       while (j > 0) {
          let b: *const stbtt__edge = p.offset(j-1);
          let c = STBTT__COMPARE!((*a),(*b));
-         if c { break; }
+         if !c { break; }
          (*p.offset(j)) = (*p.offset(j-1));
-         --j;
+         j -= 1;
       }
       if i != j {
          (*p.offset(j)) = t;

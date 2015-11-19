@@ -1626,13 +1626,13 @@ pub unsafe fn stbtt_GetCodepointBitmapBox(
 //
 //  Rasterizer
 
-struct stbtt__hheap_chunk {
-   next: *mut stbtt__hheap_chunk
+struct HheapChunk {
+   next: *mut HheapChunk
 }
 
 pub struct Hheap
 {
-   head: *mut stbtt__hheap_chunk,
+   head: *mut HheapChunk,
    first_free: *mut (),
    num_remaining_in_head_chunk: isize,
 }
@@ -1653,9 +1653,9 @@ pub unsafe fn hheap_alloc(
             } else {
                 if size < 128 { 800 } else { 100 }
             };
-         let c: *mut stbtt__hheap_chunk = STBTT_malloc!(
-             size_of::<stbtt__hheap_chunk>() + size * count as usize)
-             as *mut stbtt__hheap_chunk;
+         let c: *mut HheapChunk = STBTT_malloc!(
+             size_of::<HheapChunk>() + size * count as usize)
+             as *mut HheapChunk;
          if c == null_mut() {
             return null();
          }
@@ -1675,9 +1675,9 @@ pub unsafe fn hheap_free(hh: *mut Hheap, p: *mut ()) {
 }
 
 pub unsafe fn hheap_cleanup(hh: *mut Hheap, _userdata: *const ()) {
-   let mut c: *mut stbtt__hheap_chunk = (*hh).head;
+   let mut c: *mut HheapChunk = (*hh).head;
    while c != null_mut() {
-      let n: *mut stbtt__hheap_chunk = (*c).next;
+      let n: *mut HheapChunk = (*c).next;
       STBTT_free!(c as *mut c_void);
       c = n;
    }

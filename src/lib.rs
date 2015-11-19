@@ -685,7 +685,7 @@ macro_rules! ttLONG {
 
 macro_rules! stbtt_tag4 {
     ($p:expr, $c0:expr, $c1:expr, $c2:expr, $c3:expr) => {
-        (*$p.offset(0) == ($c0) && *$p.offset(1) == ($c1) && *$p.offset(2) == ($c2) && *$p.offset(3) == ($c3))
+        *$p.offset(0) == ($c0) && *$p.offset(1) == ($c1) && *$p.offset(2) == ($c2) && *$p.offset(3) == ($c3)
     }
 }
 
@@ -701,10 +701,10 @@ macro_rules! stbtt_tag {
 
 pub unsafe fn isfont(font: *const u8) -> isize {
    // check the version number
-   if (stbtt_tag4!(font, '1' as u8,0,0,0)) { return 1; } // TrueType 1
-   if (stbtt_tag!(font, "typ1".as_ptr()))  { return 1; } // TrueType with type 1 font -- we don't support this!
-   if (stbtt_tag!(font, "OTTO".as_ptr()))  { return 1; } // OpenType with CFF
-   if (stbtt_tag4!(font, 0,1,0,0)) { return 1; } // OpenType 1.0
+   if stbtt_tag4!(font, '1' as u8,0,0,0) { return 1; } // TrueType 1
+   if stbtt_tag!(font, "typ1".as_ptr())  { return 1; } // TrueType with type 1 font -- we don't support this!
+   if stbtt_tag!(font, "OTTO".as_ptr())  { return 1; } // OpenType with CFF
+   if stbtt_tag4!(font, 0,1,0,0) { return 1; } // OpenType 1.0
    return 0;
 }
 
@@ -718,7 +718,7 @@ pub unsafe fn find_table(
    let tabledir: u32 = fontstart + 12;
    for i in 0..num_tables {
       let loc: u32 = tabledir + 16*i as u32;
-      if (stbtt_tag!(data.offset(loc as isize +0), tag as *const u8)) {
+      if stbtt_tag!(data.offset(loc as isize +0), tag as *const u8) {
          return ttULONG!(data.offset(loc as isize +8));
       }
    }
@@ -741,12 +741,12 @@ pub unsafe fn get_font_offset_for_index(
    }
 
    // check if it's a TTC
-   if (stbtt_tag!(font_collection, "ttcf".as_ptr())) {
+   if stbtt_tag!(font_collection, "ttcf".as_ptr()) {
       // version 1?
-      if (ttULONG!(font_collection.offset(4)) == 0x00010000
-       || ttULONG!(font_collection.offset(4)) == 0x00020000) {
+      if ttULONG!(font_collection.offset(4)) == 0x00010000
+       || ttULONG!(font_collection.offset(4)) == 0x00020000 {
          let n: i32 = ttLONG!(font_collection.offset(8));
-         if (index >= n as isize) {
+         if index >= n as isize {
             return -1;
          }
          return ttULONG!(font_collection.offset(12+index*4)) as i32;
@@ -787,12 +787,12 @@ pub unsafe fn init_font(
        "hmtx".as_ptr() as *const c_char) as isize; // required
    (*info).kern = find_table(data, fontstart as u32,
        "kern".as_ptr() as *const c_char) as isize; // not required
-   if (cmap == 0
+   if cmap == 0
     || (*info).loca == 0
     || (*info).head == 0
     || (*info).glyf == 0
     || (*info).hhea == 0
-    || (*info).hmtx == 0) {
+    || (*info).hmtx == 0 {
       return 0;
    }
 
@@ -837,7 +837,7 @@ pub unsafe fn init_font(
         }
       }
    }
-   if ((*info).index_map == 0) {
+   if (*info).index_map == 0 {
       return 0;
    }
 
@@ -857,13 +857,13 @@ pub unsafe fn find_glyph_index(
    let index_map: u32 = (*info).index_map as u32;
 
    let format: u16 = ttUSHORT!(data.offset(index_map as isize + 0));
-   if (format == 0) { // apple byte encoding
+   if format == 0 { // apple byte encoding
       let bytes: i32 = ttUSHORT!(data.offset(index_map as isize + 2)) as i32;
-      if (unicode_codepoint < bytes as isize -6) {
+      if unicode_codepoint < bytes as isize -6 {
          return ttBYTE!(data.offset(index_map as isize + 6 + unicode_codepoint as isize)) as isize;
       }
       return 0;
-   } else if (format == 6) {
+   } else if format == 6 {
       let first: u32 = ttUSHORT!(data.offset(index_map as isize + 6)) as u32;
       let count: u32 = ttUSHORT!(data.offset(index_map as isize + 8)) as u32;
       if (unicode_codepoint as u32) >= first
@@ -872,10 +872,10 @@ pub unsafe fn find_glyph_index(
              index_map as isize + 10 + (unicode_codepoint - first as isize)*2)) as isize;
       }
       return 0;
-   } else if (format == 2) {
+   } else if format == 2 {
       STBTT_assert!(false); // @TODO: high-byte mapping for japanese/chinese/korean
       return 0;
-   } else if (format == 4) { // standard mapping for windows fonts: binary search collection of ranges
+   } else if format == 4 { // standard mapping for windows fonts: binary search collection of ranges
       let segcount: u16 = ttUSHORT!(data.offset(index_map as isize +6)) >> 1;
       let mut search_range: u16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
       let mut entry_selector: u16 = ttUSHORT!(data.offset(index_map as isize +10));
@@ -924,7 +924,7 @@ pub unsafe fn find_glyph_index(
 
          offset = ttUSHORT!(data.offset(index_map as isize + 14 +
              segcount as isize *6 + 2 + 2*item as isize));
-         if (offset == 0) {
+         if offset == 0 {
             return (unicode_codepoint + ttSHORT!(data.offset(
                 index_map as isize + 14 + segcount as isize *4 + 2 + 2*item as isize)) as isize)
                 as isize;
@@ -934,13 +934,13 @@ pub unsafe fn find_glyph_index(
              (unicode_codepoint-start as isize)*2 +
              index_map as isize + 14 + segcount as isize *6 + 2 + 2*item as isize)) as isize;
       }
-   } else if (format == 12 || format == 13) {
+   } else if format == 12 || format == 13 {
       let ngroups: u32 = ttULONG!(data.offset(index_map as isize +12));
       let mut low: i32;
       let mut high: i32;
       low = 0; high = ngroups as i32;
       // Binary search the right group.
-      while (low < high) {
+      while low < high {
          let mid: i32 = low + ((high-low) >> 1); // rounds down, so low <= mid < high
          let start_char: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize *12));
          let end_char: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize*12+4));
@@ -1021,7 +1021,7 @@ pub unsafe fn get_glyph_box(
     y1: *mut isize
 ) -> isize {
    let g: isize = get_glyph_offset(info, glyph_index);
-   if (g < 0) { return 0; }
+   if g < 0 { return 0; }
 
    if x0 != null_mut() { *x0 = ttSHORT!((*info).data.offset(g + 2)) as isize; }
    if y0 != null_mut() { *y0 = ttSHORT!((*info).data.offset(g + 4)) as isize; }
@@ -1157,7 +1157,7 @@ pub unsafe fn get_glyph_shape(
       // first load flags
 
       for i in 0..n {
-         if (flagcount == 0) {
+         if flagcount == 0 {
             flags = *points;
             points = points.offset(1);
             if (flags & 8) != 0 {
@@ -1214,8 +1214,8 @@ pub unsafe fn get_glyph_shape(
          flags = (*vertices.offset(off as isize +i as isize)).flags;
          x     = (*vertices.offset(off as isize +i as isize)).x as i32;
          y     = (*vertices.offset(off as isize +i as isize)).y as i32;
-         if (next_move == i) {
-            if (i != 0) {
+         if next_move == i {
+            if i != 0 {
                num_vertices = close_shape(vertices,
                    num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
             }
@@ -1269,7 +1269,7 @@ pub unsafe fn get_glyph_shape(
          }
       }
       num_vertices = close_shape(vertices, num_vertices, was_off as isize, start_off as isize, sx,sy,scx,scy,cx,cy);
-   } else if (number_of_contours == -1) {
+   } else if number_of_contours == -1 {
       // Compound shapes.
       let mut more: isize = 1;
       let mut comp: *const u8 = data.offset(g + 10);
@@ -1325,7 +1325,7 @@ pub unsafe fn get_glyph_shape(
 
          // Get indexed glyph.
          comp_num_verts = get_glyph_shape(info, gidx as isize, &mut comp_verts);
-         if (comp_num_verts > 0) {
+         if comp_num_verts > 0 {
             // Transform vertices.
             for i in 0..comp_num_verts {
                let v: *mut Vertex = comp_verts.offset(i);
@@ -1346,7 +1346,7 @@ pub unsafe fn get_glyph_shape(
                if comp_verts != null_mut() { STBTT_free!(comp_verts as *mut c_void); }
                return 0;
             }
-            if (num_vertices > 0) {
+            if num_vertices > 0 {
                 STBTT_memcpy(tmp, vertices,
                     num_vertices as usize *size_of::<Vertex>());
             }
@@ -1360,7 +1360,7 @@ pub unsafe fn get_glyph_shape(
          // More components ?
          more = (flags & (1<<5)) as isize;
       }
-   } else if (number_of_contours < 0) {
+   } else if number_of_contours < 0 {
       // @TODO other compound variations?
       STBTT_assert!(false);
    } else {
@@ -1378,7 +1378,7 @@ pub unsafe fn get_glyph_hmetrics(
     left_side_bearing: *mut isize
 ) {
    let num_of_long_hor_metrics: u16 = ttUSHORT!((*info).data.offset((*info).hhea + 34));
-   if (glyph_index < num_of_long_hor_metrics as isize) {
+   if glyph_index < num_of_long_hor_metrics as isize {
       if advance_width != null_mut() {
           *advance_width    = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index)) as isize;
       }
@@ -1422,7 +1422,7 @@ pub unsafe fn get_glyph_kern_advance(
    l = 0;
    r = ttUSHORT!(data.offset(10)) as isize - 1;
    needle = (glyph1 << 16 | glyph2) as u32;
-   while (l <= r) {
+   while l <= r {
       m = (l + r) >> 1;
       straw = ttULONG!(data.offset(18+(m*6))); // note: unaligned read
       if needle < straw {
@@ -1644,7 +1644,7 @@ pub unsafe fn hheap_alloc(
       (*hh).first_free = *(p as *mut *mut ());
       return p;
    } else {
-      if ((*hh).num_remaining_in_head_chunk == 0) {
+      if (*hh).num_remaining_in_head_chunk == 0 {
          let count: isize = if size < 32 {
                 2000
             } else {
@@ -1923,40 +1923,40 @@ pub unsafe fn handle_clipped_edge(
     mut x1: f32,
     mut y1: f32
 ) {
-   if (y0 == y1) { return; }
+   if y0 == y1 { return; }
    STBTT_assert!(y0 < y1);
    STBTT_assert!((*e).sy <= (*e).ey);
-   if (y0 > (*e).ey) { return; }
-   if (y1 < (*e).sy) { return; }
-   if (y0 < (*e).sy) {
+   if y0 > (*e).ey { return; }
+   if y1 < (*e).sy { return; }
+   if y0 < (*e).sy {
       x0 += (x1-x0) * ((*e).sy - y0) / (y1-y0);
       y0 = (*e).sy;
    }
-   if (y1 > (*e).ey) {
+   if y1 > (*e).ey {
       x1 += (x1-x0) * ((*e).ey - y1) / (y1-y0);
       y1 = (*e).ey;
    }
 
-   if (x0 == x as f32) {
+   if x0 == x as f32 {
       STBTT_assert!(x1 <= x as f32 +1.0);
    }
-   else if (x0 == x as f32 +1.0) {
+   else if x0 == x as f32 +1.0 {
       STBTT_assert!(x1 >= x as f32);
    }
-   else if (x0 <= x as f32) {
+   else if x0 <= x as f32 {
       STBTT_assert!(x1 <= x as f32);
    }
-   else if (x0 >= x as f32 +1.0) {
+   else if x0 >= x as f32 +1.0 {
       STBTT_assert!(x1 >= x as f32 +1.0);
    }
    else {
       STBTT_assert!(x1 >= x as f32 && x1 <= x as f32 +1.0);
    }
 
-   if (x0 <= x as f32 && x1 <= x as f32) {
+   if x0 <= x as f32 && x1 <= x as f32 {
       *scanline.offset(x) += (*e).direction * (y1-y0);
    }
-   else if (x0 >= x as f32 +1.0 && x1 >= x as f32 +1.0) {}
+   else if x0 >= x as f32 +1.0 && x1 >= x as f32 +1.0 {}
    else {
       STBTT_assert!(x0 >= x as f32 && x0 <= x as f32 +1.0 && x1 >= x as f32 && x1 <= x as f32 +1.0);
       *scanline.offset(x) += (*e).direction * (y1-y0) * (1.0-((x0-x as f32)+(x1-x as f32))/2.0); // coverage = 1 - average x position
@@ -1978,7 +1978,7 @@ pub unsafe fn fill_active_edges_new(
       // compute intersection points with top & bottom
       STBTT_assert!((*e).ey >= y_top);
 
-      if ((*e).fdx == 0.0) {
+      if (*e).fdx == 0.0 {
          let x0: f32 = (*e).fx;
          if x0 < len as f32 {
             if x0 >= 0.0 {
@@ -2002,14 +2002,14 @@ pub unsafe fn fill_active_edges_new(
          // compute endpoints of line segment clipped to this scanline (if the
          // line segment starts on this scanline. x0 is the intersection of the
          // line with y_top, but that may be off the line segment.
-         if ((*e).sy > y_top) {
+         if (*e).sy > y_top {
             x_top = x0 + dx * ((*e).sy - y_top);
             sy0 = (*e).sy;
          } else {
             x_top = x0;
             sy0 = y_top;
          }
-         if ((*e).ey < y_bottom) {
+         if (*e).ey < y_bottom {
             x_bottom = x0 + dx * ((*e).ey - y_top);
             sy1 = (*e).ey;
          } else {
@@ -2017,13 +2017,13 @@ pub unsafe fn fill_active_edges_new(
             sy1 = y_bottom;
          }
 
-         if (x_top >= 0.0
+         if x_top >= 0.0
           && x_bottom >= 0.0
           && x_top < len as f32
-          && x_bottom < len as f32) {
+          && x_bottom < len as f32 {
             // from here on, we don't have to range check x values
 
-            if (x_top as isize == x_bottom as isize) {
+            if x_top as isize == x_bottom as isize {
                let height: f32;
                // simple case, only spans one pixel
                let x = x_top as isize;
@@ -2176,7 +2176,7 @@ pub unsafe fn rasterize_sorted_edges(
    y = off_y;
    (*e.offset(n)).y0 = (off_y + (*result).h) as f32 + 1.0;
 
-   while (j < (*result).h) {
+   while j < (*result).h {
       // find center of pixel for this scanline
       let scan_y_top: f32 = y as f32 + 0.0;
       let scan_y_bottom: f32 = y as f32 + 1.0;
@@ -2191,7 +2191,7 @@ pub unsafe fn rasterize_sorted_edges(
       while (*step) != null_mut() {
           // Location B.
           let z: *mut ActiveEdge = *step;
-         if ((*z).ey <= scan_y_top) {
+         if (*z).ey <= scan_y_top {
             *step = (*z).next; // delete from list
             STBTT_assert!((*z).direction != 0.0);
             (*z).direction = 0.0;
@@ -2202,8 +2202,8 @@ pub unsafe fn rasterize_sorted_edges(
       }
 
       // insert all edges that start before the bottom of this scanline
-      while ((*e).y0 <= scan_y_bottom) {
-         if ((*e).y0 != (*e).y1) {
+      while (*e).y0 <= scan_y_bottom {
+         if (*e).y0 != (*e).y1 {
             let z: *mut ActiveEdge = new_active(
                 &mut hh, e, off_x, scan_y_top, userdata);
             STBTT_assert!((*z).ey >= scan_y_top);
@@ -2257,7 +2257,7 @@ pub unsafe fn rasterize_sorted_edges(
 
 macro_rules! STBTT__COMPARE {
     ($a:expr, $b:expr) => {
-        (($a).y0 < ($b).y0)
+        ($a).y0 < ($b).y0
     }
 }
 
@@ -2272,11 +2272,11 @@ pub unsafe fn sort_edges_ins_sort(
       let t: Edge = *p.offset(i);
       let a: *const Edge = &t;
       j = i;
-      while (j > 0) {
+      while j > 0 {
          let b: *const Edge = p.offset(j-1);
          let c = STBTT__COMPARE!((*a),(*b));
          if !c { break; }
-         (*p.offset(j)) = (*p.offset(j-1));
+         *p.offset(j) = *p.offset(j-1);
          j -= 1;
       }
       if i != j {
@@ -2288,7 +2288,7 @@ pub unsafe fn sort_edges_ins_sort(
 pub unsafe fn sort_edges_quicksort(mut p: *mut Edge, mut n: isize)
 {
    /* threshhold for transitioning to insertion sort */
-   while (n > 12) {
+   while n > 12 {
       let mut t: Edge;
       let c01: bool;
       let c12: bool;
@@ -2302,22 +2302,22 @@ pub unsafe fn sort_edges_quicksort(mut p: *mut Edge, mut n: isize)
       c01 = STBTT__COMPARE!((*p.offset(0)),(*p.offset(m)));
       c12 = STBTT__COMPARE!((*p.offset(m)),(*p.offset(n-1)));
       /* if 0 >= mid >= end, or 0 < mid < end, then use mid */
-      if (c01 != c12) {
+      if c01 != c12 {
          /* otherwise, we'll need to swap something else to middle */
          let z: isize;
          c = STBTT__COMPARE!((*p.offset(0)),(*p.offset(n-1)));
          /* 0>mid && mid<n:  0>n => n; 0<n => 0 */
          /* 0<mid && mid>n:  0>n => 0; 0<n => n */
          z = if c == c12 { 0 } else { n-1 };
-         t = (*p.offset(z));
-         (*p.offset(z)) = (*p.offset(m));
-         (*p.offset(m)) = t;
+         t = *p.offset(z);
+         *p.offset(z) = *p.offset(m);
+         *p.offset(m) = t;
       }
       /* now p[m] is the median-of-three */
       /* swap it to the beginning so it won't move around */
-      t = (*p.offset(0));
-      (*p.offset(0)) = (*p.offset(m));
-      (*p.offset(m)) = t;
+      t = *p.offset(0);
+      *p.offset(0) = *p.offset(m);
+      *p.offset(m) = t;
 
       /* partition loop */
       i=1;
@@ -2343,7 +2343,7 @@ pub unsafe fn sort_edges_quicksort(mut p: *mut Edge, mut n: isize)
          j -= 1;
       }
       /* recurse on smaller side, iterate on larger */
-      if (j < (n-i)) {
+      if j < (n-i) {
          sort_edges_quicksort(p,j);
          p = p.offset(i);
          n = n-i;
@@ -2477,7 +2477,7 @@ pub unsafe fn tesselate_curve(
    if n > 16 { // 65536 segments on one curve better be enough!
       return 1;
    }
-   if (dx*dx+dy*dy > objspace_flatness_squared) { // half-pixel error allowed... need to be smaller if AA
+   if dx*dx+dy*dy > objspace_flatness_squared { // half-pixel error allowed... need to be smaller if AA
       tesselate_curve(points, num_points, x0,y0, (x0+x1)/2.0,(y0+y1)/2.0, mx,my, objspace_flatness_squared,n+1);
       tesselate_curve(points, num_points, mx,my, (x1+x2)/2.0,(y1+y2)/2.0, x2,y2, objspace_flatness_squared,n+1);
    } else {
@@ -2515,7 +2515,7 @@ pub unsafe fn flatten_curves(
 
    *contour_lengths = STBTT_malloc!(size_of::<isize>() * n as usize) as *mut isize;
 
-   if (*contour_lengths == null_mut()) {
+   if *contour_lengths == null_mut() {
       *num_contours = 0;
       return null_mut();
    }
@@ -2525,7 +2525,7 @@ pub unsafe fn flatten_curves(
    for pass in 0..2 {
       let mut x: f32=0.0;
       let mut y: f32=0.0;
-      if (pass == 1) {
+      if pass == 1 {
          points = STBTT_malloc!(num_points as usize * size_of::<Point>())
             as *mut Point;
          if points == null_mut() {
@@ -2538,7 +2538,7 @@ pub unsafe fn flatten_curves(
          match (*vertices.offset(i)).type_ {
             Cmd::Move => {
                // start the next contour
-               if (n >= 0) {
+               if n >= 0 {
                   *(*contour_lengths).offset(n) = num_points - start;
                }
                n += 1;
@@ -3021,18 +3021,18 @@ pub unsafe fn stbrp_pack_rects(
     num_rects: isize
 ) {
    for i in 0..num_rects {
-      if ((*con).x + (*rects.offset(i)).w > (*con).width) {
+      if (*con).x + (*rects.offset(i)).w > (*con).width {
          (*con).x = 0;
          (*con).y = (*con).bottom_y;
       }
-      if ((*con).y + (*rects.offset(i)).h > (*con).height) {
+      if (*con).y + (*rects.offset(i)).h > (*con).height {
          break;
       }
       (*rects.offset(i)).x = (*con).x;
       (*rects.offset(i)).y = (*con).y;
       (*rects.offset(i)).was_packed = 1;
       (*con).x += (*rects.offset(i)).w;
-      if ((*con).y + (*rects.offset(i)).h > (*con).bottom_y) {
+      if (*con).y + (*rects.offset(i)).h > (*con).bottom_y {
          (*con).bottom_y = (*con).y + (*rects.offset(i)).h;
       }
    }
@@ -3128,10 +3128,10 @@ pub unsafe fn pack_set_oversampling(
 {
    STBTT_assert!(h_oversample <= STBTT_MAX_OVERSAMPLE);
    STBTT_assert!(v_oversample <= STBTT_MAX_OVERSAMPLE);
-   if (h_oversample <= STBTT_MAX_OVERSAMPLE) {
+   if h_oversample <= STBTT_MAX_OVERSAMPLE {
       (*spc).h_oversample = h_oversample;
    }
-   if (v_oversample <= STBTT_MAX_OVERSAMPLE) {
+   if v_oversample <= STBTT_MAX_OVERSAMPLE {
       (*spc).v_oversample = v_oversample;
    }
 }
@@ -3368,7 +3368,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
       sub_y = oversample_shift((*spc).v_oversample as isize);
       for j in 0..(*ranges.offset(i)).num_chars {
          let r: *mut Rect = rects.offset(k);
-         if ((*r).was_packed != 0) {
+         if (*r).was_packed != 0 {
             let bc: *mut PackedChar = (*ranges.offset(i)).chardata_for_range.offset(j);
             let mut advance: isize = 0;
             let mut lsb: isize = 0;
@@ -3563,7 +3563,7 @@ pub unsafe fn get_packed_quad(
    let iph: f32 = 1.0 / ph as f32;
    let b: *const PackedChar = chardata.offset(char_index);
 
-   if (align_to_integer != 0) {
+   if align_to_integer != 0 {
       let x: f32 = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5) as f32;
       let y: f32 = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5) as f32;
       (*q).x0 = x;
@@ -3601,9 +3601,9 @@ pub unsafe fn compare_utf8_to_utf16_bigendian_prefix(
    let mut i: i32 =0;
 
    // convert utf16 to utf8 and compare the results while converting
-   while (len2 != 0) {
-      let ch: u16 = (*s2.offset(0) as u16 *256 + *s2.offset(1) as u16);
-      if (ch < 0x80) {
+   while len2 != 0 {
+      let ch: u16 = *s2.offset(0) as u16 *256 + *s2.offset(1) as u16;
+      if ch < 0x80 {
          if i >= len1 { return -1; }
          if *s1.offset(i as isize) != ch as u8 { return -1; }
          i += 1;
@@ -3611,11 +3611,11 @@ pub unsafe fn compare_utf8_to_utf16_bigendian_prefix(
          if i+1 >= len1 { return -1; }
          if *s1.offset(i as isize) != (0xc0 + (ch >> 6)) as u8 { return -1; }
          i += 1;
-         if (*s1.offset(i as isize) != (0x80 + (ch & 0x3f)) as u8) { return -1; }
+         if *s1.offset(i as isize) != (0x80 + (ch & 0x3f)) as u8 { return -1; }
          i += 1;
-      } else if (ch >= 0xd800 && ch < 0xdc00) {
+      } else if ch >= 0xd800 && ch < 0xdc00 {
          let c: u32;
-         let ch2: u16 = (*s2.offset(2) as u16 *256 + *s2.offset(3) as u16);
+         let ch2: u16 = *s2.offset(2) as u16 *256 + *s2.offset(3) as u16;
          if i+3 >= len1 { return -1; }
          c = ((ch - 0xd800) << 10) as u32 + (ch2 - 0xdc00) as u32 + 0x10000;
          if *s1.offset(i as isize) != (0xf0 + (c >> 18)) as u8 { return -1; }
@@ -3628,7 +3628,7 @@ pub unsafe fn compare_utf8_to_utf16_bigendian_prefix(
          i += 1;
          s2 = s2.offset(2); // plus another 2 below
          len2 -= 2;
-      } else if (ch >= 0xdc00 && ch < 0xe000) {
+      } else if ch >= 0xdc00 && ch < 0xe000 {
          return -1;
       } else {
          if i+2 >= len1 { return -1; }
@@ -3685,8 +3685,8 @@ pub unsafe fn get_font_name_string(
    string_offset = nm as i32 + ttUSHORT!(fc.offset(nm as isize +4)) as i32;
    for i in 0..count as u32 {
       let loc: u32 = nm + 6 + 12 * i;
-      if (platform_id == ttUSHORT!(fc.offset(loc as isize +0)) as isize && encoding_id == ttUSHORT!(fc.offset(loc as isize +2)) as isize
-          && language_id == ttUSHORT!(fc.offset(loc as isize +4)) as isize && name_id == ttUSHORT!(fc.offset(loc as isize +6)) as isize) {
+      if platform_id == ttUSHORT!(fc.offset(loc as isize +0)) as isize && encoding_id == ttUSHORT!(fc.offset(loc as isize +2)) as isize
+          && language_id == ttUSHORT!(fc.offset(loc as isize +4)) as isize && name_id == ttUSHORT!(fc.offset(loc as isize +6)) as isize {
          *length = ttUSHORT!(fc.offset(loc as isize +8)) as isize;
          return (fc.offset(string_offset as isize +ttUSHORT!(fc.offset(loc as isize +10)) as isize)) as *const u8;
       }
@@ -3715,30 +3715,30 @@ pub unsafe fn matchpair(
          let language: i32 = ttUSHORT!(fc.offset(loc as isize +4)) as i32;
 
          // is this a Unicode encoding?
-         if (platform == 0 || (platform == 3 && encoding == 1) || (platform == 3 && encoding == 10)) {
+         if platform == 0 || (platform == 3 && encoding == 1) || (platform == 3 && encoding == 10) {
             let mut slen: i32 = ttUSHORT!(fc.offset(loc as isize +8)) as i32;
             let mut off: i32 = ttUSHORT!(fc.offset(loc as isize +10)) as i32;
 
             // check if there's a prefix match
             let mut matchlen: i32 = compare_utf8_to_utf16_bigendian_prefix(
                 name, nlen, fc.offset(string_offset as isize + off as isize),slen);
-            if (matchlen >= 0) {
+            if matchlen >= 0 {
                // check for target_id+1 immediately following, with same encoding & language
-               if (i+1 < count && ttUSHORT!(fc.offset(loc as isize +12+6)) == next_id as u16
+               if i+1 < count && ttUSHORT!(fc.offset(loc as isize +12+6)) == next_id as u16
                && ttUSHORT!(fc.offset(loc as isize +12)) == platform as u16
                && ttUSHORT!(fc.offset(loc as isize +12+2)) == encoding as u16
-               && ttUSHORT!(fc.offset(loc as isize +12+4)) == language as u16) {
+               && ttUSHORT!(fc.offset(loc as isize +12+4)) == language as u16 {
                   slen = ttUSHORT!(fc.offset(loc as isize +12+8)) as i32;
                   off = ttUSHORT!(fc.offset(loc as isize +12+10)) as i32;
-                  if (slen == 0) {
+                  if slen == 0 {
                      if matchlen == nlen {
                         return 1;
                      }
-                  } else if (matchlen < nlen && *name.offset(matchlen as isize) == ' ' as u8) {
+                  } else if matchlen < nlen && *name.offset(matchlen as isize) == ' ' as u8 {
                      matchlen += 1;
-                     if (compare_utf8_to_utf16_bigendian(
+                     if compare_utf8_to_utf16_bigendian(
                          (name.offset(matchlen as isize)) as *mut u8, (nlen - matchlen) as isize,
-                         (fc.offset(string_offset as isize + off as isize)) as *mut u8,slen as isize) != 0) {
+                         (fc.offset(string_offset as isize + off as isize)) as *mut u8,slen as isize) != 0 {
                         return 1;
                     }
                   }
@@ -3766,26 +3766,26 @@ pub unsafe fn matches(
     let nlen: i32 = STBTT_strlen(name as *mut c_char) as i32;
     let nm: u32;
     let hd: u32;
-   if (isfont(fc.offset(offset as isize)) == 0) { return 0; }
+   if isfont(fc.offset(offset as isize)) == 0 { return 0; }
 
    // check italics/bold/underline flags in macStyle...
-   if (flags != 0) {
+   if flags != 0 {
       hd = find_table(fc, offset, CString::new("head").unwrap().as_ptr());
-      if ((ttUSHORT!(fc.offset(hd as isize + 44)) & 7) != (flags as u16 & 7)) { return 0; }
+      if (ttUSHORT!(fc.offset(hd as isize + 44)) & 7) != (flags as u16 & 7) { return 0; }
    }
 
    nm = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
-   if (nm == 0) { return 0; }
+   if nm == 0 { return 0; }
 
-   if (flags != 0) {
+   if flags != 0 {
       // if we checked the macStyle flags, then just check the family and ignore the subfamily
-      if (matchpair(fc, nm, name, nlen, 16, -1) != 0) { return 1; }
-      if (matchpair(fc, nm, name, nlen,  1, -1) != 0) { return 1; }
-      if (matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
+      if matchpair(fc, nm, name, nlen, 16, -1) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  1, -1) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  3, -1) != 0 { return 1; }
    } else {
-      if (matchpair(fc, nm, name, nlen, 16, 17) != 0) { return 1; }
-      if (matchpair(fc, nm, name, nlen,  1,  2) != 0) { return 1; }
-      if (matchpair(fc, nm, name, nlen,  3, -1) != 0) { return 1; }
+      if matchpair(fc, nm, name, nlen, 16, 17) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  1,  2) != 0 { return 1; }
+      if matchpair(fc, nm, name, nlen,  3, -1) != 0 { return 1; }
    }
 
    return 0;
@@ -3803,8 +3803,8 @@ pub unsafe fn find_matching_font(
    for i in 0.. {
       let off: i32 = get_font_offset_for_index(font_collection, i);
       if off < 0 { return off; }
-      if (matches(font_collection as *mut u8,
-            off as u32, name_utf8 as *mut u8, flags) != 0) {
+      if matches(font_collection as *mut u8,
+            off as u32, name_utf8 as *mut u8, flags) != 0 {
          return off;
       }
    }

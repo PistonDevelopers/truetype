@@ -492,10 +492,10 @@ impl stbtt_fontinfo {
 //
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub enum STBTT_cmd {
-  vmove=1,
-  vline=2,
-  vcurve=3
+pub enum Cmd {
+  Move=1,
+  Line=2,
+  Curve=3
 }
 
 type VertexType = i16;
@@ -505,7 +505,7 @@ pub struct Vertex {
    y: i16,
    cx: i16,
    cy: i16,
-   type_: STBTT_cmd,
+   type_: Cmd,
    flags: u8,
 }
 
@@ -984,7 +984,7 @@ pub unsafe fn get_codepoint_shape(
 
 pub unsafe fn stbtt_setvertex(
     v: *mut Vertex,
-    type_: STBTT_cmd,
+    type_: Cmd,
     x: stbtt_int32,
     y: stbtt_int32,
     cx: stbtt_int32,
@@ -1076,17 +1076,17 @@ pub unsafe fn close_shape(
    if start_off != 0 {
       if was_off != 0 {
          stbtt_setvertex(vertices.offset(num_vertices),
-             STBTT_cmd::vcurve, (cx+scx)>>1, (cy+scy)>>1, cx,cy);
+             Cmd::Curve, (cx+scx)>>1, (cy+scy)>>1, cx,cy);
          num_vertices += 1;
       }
-      stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vcurve, sx,sy,scx,scy);
+      stbtt_setvertex(vertices.offset(num_vertices), Cmd::Curve, sx,sy,scx,scy);
       num_vertices += 1;
    } else {
       if was_off != 0 {
-         stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vcurve,sx,sy,cx,cy);
+         stbtt_setvertex(vertices.offset(num_vertices), Cmd::Curve,sx,sy,cx,cy);
          num_vertices += 1;
       } else {
-         stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vline,sx,sy,0,0);
+         stbtt_setvertex(vertices.offset(num_vertices), Cmd::Line,sx,sy,0,0);
          num_vertices += 1;
       }
    }
@@ -1234,7 +1234,7 @@ pub unsafe fn get_glyph_shape(
                // where we can start, and we need to save some state for when we wraparound.
                scx = x;
                scy = y;
-               if (*vertices.offset(off as isize +i as isize +1)).type_ == STBTT_cmd::vline {
+               if (*vertices.offset(off as isize +i as isize +1)).type_ == Cmd::Line {
                   // next point is also a curve point, so interpolate an on-point curve
                   sx = (x + (*vertices.offset(off as isize +i as isize +1)).x as stbtt_int32) >> 1;
                   sy = (y + (*vertices.offset(off as isize +i as isize +1)).y as stbtt_int32) >> 1;
@@ -1248,7 +1248,7 @@ pub unsafe fn get_glyph_shape(
                sx = x;
                sy = y;
             }
-            stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vmove,sx,sy,0,0);
+            stbtt_setvertex(vertices.offset(num_vertices), Cmd::Move,sx,sy,0,0);
             num_vertices += 1;
             was_off = 0;
             next_move = 1 + ttUSHORT!(end_pts_of_contours.offset(j as isize *2)) as i32;
@@ -1257,7 +1257,7 @@ pub unsafe fn get_glyph_shape(
             if (flags & 1) == 0 { // if it's a curve
                if was_off != 0 { // two off-curve control points in a row means interpolate an on-curve midpoint
                   stbtt_setvertex(vertices.offset(num_vertices),
-                      STBTT_cmd::vcurve, (cx+x)>>1, (cy+y)>>1, cx, cy);
+                      Cmd::Curve, (cx+x)>>1, (cy+y)>>1, cx, cy);
                   num_vertices += 1;
                }
                cx = x;
@@ -1265,10 +1265,10 @@ pub unsafe fn get_glyph_shape(
                was_off = 1;
             } else {
                if was_off != 0 {
-                  stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vcurve, x,y, cx, cy);
+                  stbtt_setvertex(vertices.offset(num_vertices), Cmd::Curve, x,y, cx, cy);
                   num_vertices += 1;
                } else {
-                  stbtt_setvertex(vertices.offset(num_vertices), STBTT_cmd::vline, x,y,0,0);
+                  stbtt_setvertex(vertices.offset(num_vertices), Cmd::Line, x,y,0,0);
                   num_vertices += 1;
                }
                was_off = 0;
@@ -2512,7 +2512,7 @@ pub unsafe fn flatten_curves(
 
    // count how many "moves" there are to get the contour count
    for i in 0..num_verts {
-      if (*vertices.offset(i)).type_ == STBTT_cmd::vmove {
+      if (*vertices.offset(i)).type_ == Cmd::Move {
          n += 1;
       }
    }
@@ -2543,7 +2543,7 @@ pub unsafe fn flatten_curves(
       n= -1;
       for i in 0..num_verts {
          match (*vertices.offset(i)).type_ {
-            STBTT_cmd::vmove => {
+            Cmd::Move => {
                // start the next contour
                if (n >= 0) {
                   *(*contour_lengths).offset(n) = num_points - start;
@@ -2556,13 +2556,13 @@ pub unsafe fn flatten_curves(
                add_point(points, num_points, x,y);
                num_points += 1;
             }
-            STBTT_cmd::vline => {
+            Cmd::Line => {
                x = (*vertices.offset(i)).x as f32;
                y = (*vertices.offset(i)).y as f32;
                add_point(points, num_points, x, y);
                num_points += 1;
             }
-            STBTT_cmd::vcurve => {
+            Cmd::Curve => {
                tesselate_curve(points, &mut num_points, x,y,
                                         (*vertices.offset(i)).cx as f32, (*vertices.offset(i)).cy as f32,
                                         (*vertices.offset(i)).x as f32,  (*vertices.offset(i)).y as f32,

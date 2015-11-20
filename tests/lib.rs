@@ -3,11 +3,9 @@ extern crate piston_truetype;
 use std::ptr::{null_mut};
 use piston_truetype::*;
 
-#[test]
-fn draw_capital_a() {
+fn expect_glyph(letter: char, expected: String) {
     unsafe {
         let bs = include_bytes!("Tuffy_Bold.ttf");
-        let c = 'A' as u8;
         let s = 20.0;
 
         let mut w = 0;
@@ -17,7 +15,7 @@ fn draw_capital_a() {
 
         let font = FontInfo::new_with_offset(&bs[..], offset).ok().expect("Failed to load font");
         let scale = scale_for_pixel_height(&font, s);
-        let bitmap = get_codepoint_bitmap(&font, 0.0,scale, c as isize, &mut w, &mut h, null_mut(),null_mut());
+        let bitmap = get_codepoint_bitmap(&font, 0.0,scale, letter as isize, &mut w, &mut h, null_mut(),null_mut());
 
         let mut result = String::new();
         for j in 0..h {
@@ -27,22 +25,47 @@ fn draw_capital_a() {
             result.push('\n');
         }
 
-        let expected = String::new() +
-            "    VMM     \n" +
-            "    @@@i    \n" +
-            "   i@@@M    \n" +
-            "   M@o@@.   \n" +
-            "  .@@.V@o   \n" +
-            "  o@M i@@   \n" +
-            "  M@i .@@.  \n" +
-            " .@@@@@@@o  \n" +
-            " o@@@@@@@@  \n" +
-            " @@o   .@@: \n" +
-            ":@@.    M@V \n" +
-            "V@M     i@@ \n";
-
         if result != expected {
-            panic!("The `A` is malformed.\n\n\nExpected:\n{}\n\nGot:\n{}", result, expected);
+            println!("\n{:?}", expected);
+            println!("{:?}", result);
+            panic!("The `A` is malformed.\n\n\nExpected:\n{}|\n\nGot:\n{}|", result, expected);
         }
     }
+}
+
+
+#[test]
+fn draw_capital_a() {
+    expect_glyph('A', String::new() +
+        "    VMM     \n" +
+        "    @@@i    \n" +
+        "   i@@@M    \n" +
+        "   M@o@@.   \n" +
+        "  .@@.V@o   \n" +
+        "  o@M i@@   \n" +
+        "  M@i .@@.  \n" +
+        " .@@@@@@@o  \n" +
+        " o@@@@@@@@  \n" +
+        " @@o   .@@: \n" +
+        ":@@.    M@V \n" +
+        "V@M     i@@ \n" );
+}
+
+#[test]
+fn draw_capital_g() {
+    expect_glyph('G', String::new() +
+        "     .     \n" +
+        "   o@@@V.  \n" +
+        "  M@@M@@@  \n" +
+        " i@@:  Vo. \n" +
+        " @@o       \n" +
+        ".@@.       \n" +
+        ".@@  .oooo:\n" +
+        ".@@  .@@@@i\n" +
+        " @@:  iiM@i\n" +
+        " M@o    @@.\n" +
+        " i@@:  i@@ \n" +
+        "  M@@MM@@: \n" +
+        "   o@@@@:  \n" +
+        "     .     \n" );
 }

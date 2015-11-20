@@ -6,16 +6,16 @@ use piston_truetype::*;
 #[test]
 fn draw_capital_a() {
     unsafe {
-        let mut font = FontInfo::uninitialized();
+        let bs = include_bytes!("Tuffy_Bold.ttf");
         let c = 'A' as u8;
         let s = 20.0;
-        let mut ttf_buffer = include_bytes!("Tuffy_Bold.ttf").to_vec();
 
         let mut w = 0;
         let mut h = 0;
 
-        let offset = get_font_offset_for_index(ttf_buffer.as_ptr(),0) as isize;
-        init_font(&mut font, ttf_buffer[..].as_mut_ptr(), offset);
+        let offset = get_font_offset_for_index(bs.as_ptr(),0) as usize;
+
+        let font = FontInfo::new_with_offset(&bs[..], offset).ok().expect("Failed to load font");
         let scale = scale_for_pixel_height(&font, s);
         let bitmap = get_codepoint_bitmap(&font, 0.0,scale, c as isize, &mut w, &mut h, null_mut(),null_mut());
 

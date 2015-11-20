@@ -421,52 +421,141 @@ pub struct PackContext {
 
 // The following structure is defined publically so you can declare one on
 // the stack or as a global or etc, but you should treat it as opaque.
-pub struct FontInfo {
-   userdata: *const (),
+pub struct FontInfo<'a> {
    // pointer to .ttf file
-   data: *mut u8,
+   data: &'a [u8],
    // offset of start of font
-   fontstart: isize,
+   fontstart: usize,
    // number of glyphs, needed for range checking
-   num_glyphs: isize,
+   num_glyphs: usize,
 
    // table locations as offset from start of .ttf
-   loca: isize,
-   head: isize,
-   glyf: isize,
-   hhea: isize,
-   hmtx: isize,
-   kern: isize,
+   loca: usize,
+   head: usize,
+   glyf: usize,
+   hhea: usize,
+   hmtx: usize,
+   kern: usize,
    // a cmap mapping for our chosen character encoding
-   index_map: isize,
+   index_map: usize,
    // format needed to map from glyph index to glyph
-   index_to_loc_format: isize,
+   index_to_loc_format: usize,
 }
 
-impl FontInfo {
-    pub fn uninitialized() -> FontInfo {
-        FontInfo{
-            userdata: null(),
-           // pointer to .ttf file
-           data: null_mut(),
-           // offset of start of font
-           fontstart: 0,
-           // number of glyphs, needed for range checking
-           num_glyphs: 0,
+pub enum Error {
+    Malformed,
+    MissingTable,
+}
 
-           // table locations as offset from start of .ttf
-           loca: 0,
-           head: 0,
-           glyf: 0,
-           hhea: 0,
-           hmtx: 0,
-           kern: 0,
-           // a cmap mapping for our chosen character encoding
-           index_map: 0,
-           // format needed to map from glyph index to glyph
-           index_to_loc_format: 0,
+impl<'a> FontInfo<'a> {
+    // Given an offset into the file that defines a font, this function builds
+    // the necessary cached info for the rest of the system.
+    pub fn new_with_offset(data: &[u8], fontstart: usize) -> Result<FontInfo, Error> {
+        let mut info = FontInfo{
+            data: data,
+            fontstart: 0,
+            num_glyphs: 0,
+            loca: 0,
+            head: 0,
+            glyf: 0,
+            hhea: 0,
+            hmtx: 0,
+            kern: 0,
+            index_map: 0,
+            index_to_loc_format: 0,
+        };
+
+        info.fontstart = fontstart;
+
+        let cmap = try!(info.find_required_table(b"cmap"));
+        info.loca = try!(info.find_required_table(b"loca"));
+        info.head = try!(info.find_required_table(b"head"));
+        info.glyf = try!(info.find_required_table(b"glyf"));
+        info.hhea = try!(info.find_required_table(b"hhea"));
+        info.hmtx = try!(info.find_required_table(b"hmtx"));
+        info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
+
+        info.num_glyphs = match try!(info.find_table(b"maxp")) {
+            Some(maxp) => try!(info.read_u16(maxp + 4)) as usize,
+            None => 0xffff
+        };
+
+        // find a cmap encoding table we understand *now* to avoid searching
+        // later. (todo: could make this installable)
+        // the same regardless of glyph.
+        let num_tables = try!(info.read_u16(cmap + 2));
+        info.index_map = 0;
+        for encoding_record in info.data[cmap + 4..].chunks(8).take(num_tables as usize) {
+            if encoding_record.len() != 8 {
+                return Err(Error::Malformed);
+            }
+            let val: PlatformId = BigEndian::read_u16(&encoding_record[0..2]).into();
+            match val {
+                PlatformId::Microsoft => {
+                    let val: MsEid = BigEndian::read_u16(&encoding_record[2..4]).into();
+                    match val {
+                        MsEid::UnicodeBmp
+                        | MsEid::UnicodeFull => {
+                            // MS/Unicode
+                            info.index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
+                        }
+                        _ => {
+                            // TODO: Check extra cases.
+                        }
+                    }
+                }
+                PlatformId::Unicode => {
+                    // Mac/iOS has these
+                    // all the encodingIDs are unicode, so we don't bother to check it
+                    info.index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
+                }
+                _ => {
+                    // TODO: Mac not supported?
+                }
+            }
+        }
+        if info.index_map == 0 {
+            return Err(Error::MissingTable);
+        }
+
+        info.index_to_loc_format = try!(info.read_u16(info.head+50)) as usize;
+
+        Ok(info)
+    }
+
+    fn read_u16(&self, offset: usize) -> Result<u16, Error> {
+        if self.data.len()<2 || offset >= self.data.len() {
+            return Err(Error::Malformed);
+        }
+
+        Ok(BigEndian::read_u16(&self.data[offset..offset+2]))
+    }
+
+    fn find_required_table(&self, tag: &[u8; 4]) -> Result<usize, Error> {
+        match try!(self.find_table(tag)) {
+            Some(offset) => Ok(offset),
+            None => Err(Error::MissingTable)
         }
     }
+
+    fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>, Error> {
+        let num_tables = try!(self.read_u16(self.fontstart + 4)) as usize;
+        let tabledir: usize = self.fontstart + 12;
+
+        if tabledir > self.data.len() {
+            return Err(Error::Malformed);
+        }
+        for table_chunk in self.data[tabledir..].chunks(16).take(num_tables) {
+            if table_chunk.len()==16 && prefix_is_tag(table_chunk, tag) {
+                return Ok(Some(BigEndian::read_u32(&table_chunk[8..12]) as usize));
+            }
+        }
+        return Ok(None);
+    }
+}
+
+fn prefix_is_tag(bs: &[u8], tag: &[u8; 4]) -> bool {
+    bs.len()>=4 && bs[0]==tag[0] && bs[1]==tag[1] && bs[2]==tag[2] && bs[3]==tag[3]
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -755,96 +844,6 @@ pub unsafe fn get_font_offset_for_index(
    return -1;
 }
 
-// Given an offset into the file that defines a font, this function builds
-// the necessary cached info for the rest of the system. You must allocate
-// the FontInfo yourself, and stbtt_InitFont will fill it out. You don't
-// need to do anything special to free it, because the contents are pure
-// value data with no additional data structures. Returns 0 on failure.
-pub unsafe fn init_font(
-    info: *mut FontInfo,
-    data2: *mut u8,
-    fontstart: isize
-) -> isize {
-   let data: *mut u8 = data2;
-   let cmap: u32;
-   let t: u32;
-   let num_tables: i32;
-
-   (*info).data = data;
-   (*info).fontstart = fontstart;
-
-   cmap = find_table(data, fontstart as u32,
-       "cmap".as_ptr() as *const c_char) as u32;       // required
-   (*info).loca = find_table(data, fontstart as u32,
-       "loca".as_ptr() as *const c_char) as isize; // required
-   (*info).head = find_table(data, fontstart as u32,
-       "head".as_ptr() as *const c_char) as isize; // required
-   (*info).glyf = find_table(data, fontstart as u32,
-       "glyf".as_ptr() as *const c_char) as isize; // required
-   (*info).hhea = find_table(data, fontstart as u32,
-       "hhea".as_ptr() as *const c_char) as isize; // required
-   (*info).hmtx = find_table(data, fontstart as u32,
-       "hmtx".as_ptr() as *const c_char) as isize; // required
-   (*info).kern = find_table(data, fontstart as u32,
-       "kern".as_ptr() as *const c_char) as isize; // not required
-   if cmap == 0
-    || (*info).loca == 0
-    || (*info).head == 0
-    || (*info).glyf == 0
-    || (*info).hhea == 0
-    || (*info).hmtx == 0 {
-      return 0;
-   }
-
-   t = find_table(data, fontstart as u32,
-       "maxp".as_ptr() as *const c_char);
-   if t != 0 {
-      (*info).num_glyphs = ttUSHORT!(data.offset(t as isize +4)) as isize;
-   } else {
-      (*info).num_glyphs = 0xffff;
-   }
-
-   // find a cmap encoding table we understand *now* to avoid searching
-   // later. (todo: could make this installable)
-   // the same regardless of glyph.
-   num_tables = ttUSHORT!(data.offset(cmap as isize + 2)) as i32;
-   (*info).index_map = 0;
-   for i in 0..num_tables {
-      let encoding_record: u32 = cmap + 4 + 8 * i as u32;
-      // find an encoding we understand:
-      let val: PlatformId = ttUSHORT!(data.offset(encoding_record as isize)).into();
-      match val {
-         PlatformId::Microsoft => {
-             let val: MsEid = ttUSHORT!(data.offset(encoding_record as isize +2)).into();
-            match val {
-               MsEid::UnicodeBmp
-               | MsEid::UnicodeFull => {
-                  // MS/Unicode
-                  (*info).index_map = cmap as isize + ttULONG!(data.offset(encoding_record as isize +4)) as isize;
-               }
-               _ => {
-                   // TODO: Check extra cases.
-               }
-            }
-        }
-        PlatformId::Unicode => {
-            // Mac/iOS has these
-            // all the encodingIDs are unicode, so we don't bother to check it
-            (*info).index_map = cmap as isize + ttULONG!(data.offset(encoding_record as isize +4)) as isize;
-        }
-        _ => {
-            // TODO: Mac not supported?
-        }
-      }
-   }
-   if (*info).index_map == 0 {
-      return 0;
-   }
-
-   (*info).index_to_loc_format = ttUSHORT!(data.offset((*info).head + 50)) as isize;
-   return 1;
-}
-
 // If you're going to perform multiple operations on the same character
 // and you want a speed-up, call this function with the character you're
 // going to process, then use glyph-based functions instead of the
@@ -853,7 +852,7 @@ pub unsafe fn find_glyph_index(
     info: *const FontInfo,
     unicode_codepoint: isize
 ) -> isize {
-   let data: *mut u8 = (*info).data;
+   let data: *const u8 = (*info).data.as_ptr();
    let index_map: u32 = (*info).index_map as u32;
 
    let format: u16 = ttUSHORT!(data.offset(index_map as isize + 0));
@@ -997,15 +996,15 @@ pub unsafe fn get_glyph_offset(
    let g1: isize;
    let g2: isize;
 
-   if glyph_index >= (*info).num_glyphs { return -1; } // glyph index out of range
+   if glyph_index >= (*info).num_glyphs as isize { return -1; } // glyph index out of range
    if (*info).index_to_loc_format >= 2   { return -1; } // unknown index->glyph map format
 
    if (*info).index_to_loc_format == 0 {
-      g1 = (*info).glyf + ttUSHORT!((*info).data.offset((*info).loca + glyph_index * 2)) as isize * 2;
-      g2 = (*info).glyf + ttUSHORT!((*info).data.offset((*info).loca + glyph_index * 2 + 2)) as isize * 2;
+      g1 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2)) as isize * 2;
+      g2 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2 + 2)) as isize * 2;
    } else {
-      g1 = (*info).glyf + ttULONG!((*info).data.offset((*info).loca + glyph_index * 4)) as isize;
-      g2 = (*info).glyf + ttULONG!((*info).data.offset((*info).loca + glyph_index * 4 + 4)) as isize;
+      g1 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4)) as isize;
+      g2 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4 + 4)) as isize;
    }
 
    return if g1==g2 { -1 } else { g1 }; // if length is 0, return -1
@@ -1023,10 +1022,10 @@ pub unsafe fn get_glyph_box(
    let g: isize = get_glyph_offset(info, glyph_index);
    if g < 0 { return 0; }
 
-   if x0 != null_mut() { *x0 = ttSHORT!((*info).data.offset(g + 2)) as isize; }
-   if y0 != null_mut() { *y0 = ttSHORT!((*info).data.offset(g + 4)) as isize; }
-   if x1 != null_mut() { *x1 = ttSHORT!((*info).data.offset(g + 6)) as isize; }
-   if y1 != null_mut() { *y1 = ttSHORT!((*info).data.offset(g + 8)) as isize; }
+   if x0 != null_mut() { *x0 = ttSHORT!((*info).data.as_ptr().offset(g + 2)) as isize; }
+   if y0 != null_mut() { *y0 = ttSHORT!((*info).data.as_ptr().offset(g + 4)) as isize; }
+   if x1 != null_mut() { *x1 = ttSHORT!((*info).data.as_ptr().offset(g + 6)) as isize; }
+   if y1 != null_mut() { *y1 = ttSHORT!((*info).data.as_ptr().offset(g + 8)) as isize; }
    return 1;
 }
 
@@ -1050,7 +1049,7 @@ pub unsafe fn is_glyph_empty(
    let number_of_contours: i16;
    let g: isize = get_glyph_offset(info, glyph_index);
    if g < 0 { return 1; }
-   number_of_contours = ttSHORT!((*info).data.offset(g));
+   number_of_contours = ttSHORT!((*info).data.as_ptr().offset(g));
    return if number_of_contours == 0 { 0 } else { 1 };
 }
 
@@ -1101,8 +1100,8 @@ pub unsafe fn get_glyph_shape(
     pvertices: *mut *mut Vertex
 ) -> isize {
    let number_of_contours: i16;
-   let end_pts_of_contours: *mut u8;
-   let data: *mut u8 = (*info).data;
+   let end_pts_of_contours: *const u8;
+   let data: *const u8 = (*info).data.as_ptr();
    let mut vertices: *mut Vertex=null_mut();
    let mut num_vertices: isize =0;
    let g: isize = get_glyph_offset(info, glyph_index);
@@ -1132,7 +1131,7 @@ pub unsafe fn get_glyph_shape(
       let mut sy: i32;
       let mut scx: i32;
       let mut scy: i32;
-      let mut points: *mut u8;
+      let mut points: *const u8;
       end_pts_of_contours = data.offset(g + 10);
       ins = ttUSHORT!(data.offset(g + 10 + number_of_contours as isize * 2)) as i32;
       points = data.offset(g + 10 + number_of_contours as isize * 2 + 2 + ins as isize);
@@ -1377,21 +1376,21 @@ pub unsafe fn get_glyph_hmetrics(
     advance_width: *mut isize,
     left_side_bearing: *mut isize
 ) {
-   let num_of_long_hor_metrics: u16 = ttUSHORT!((*info).data.offset((*info).hhea + 34));
+   let num_of_long_hor_metrics: u16 = ttUSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 34));
    if glyph_index < num_of_long_hor_metrics as isize {
       if advance_width != null_mut() {
-          *advance_width    = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index)) as isize;
+          *advance_width    = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*glyph_index)) as isize;
       }
       if left_side_bearing != null_mut() {
-          *left_side_bearing = ttSHORT!((*info).data.offset((*info).hmtx + 4*glyph_index + 2)) as isize;
+          *left_side_bearing = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*glyph_index + 2)) as isize;
       }
    } else {
       if advance_width != null_mut() {
-          *advance_width    = ttSHORT!((*info).data.offset((*info).hmtx + 4*(num_of_long_hor_metrics as isize -1))) as isize;
+          *advance_width    = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*(num_of_long_hor_metrics as isize -1))) as isize;
       }
       if left_side_bearing != null_mut() {
-          *left_side_bearing = ttSHORT!((*info).data.offset(
-              (*info).hmtx + 4*num_of_long_hor_metrics as isize + 2*(glyph_index - num_of_long_hor_metrics as isize))) as isize;
+          *left_side_bearing = ttSHORT!((*info).data.as_ptr().offset(
+              (*info).hmtx as isize + 4*num_of_long_hor_metrics as isize + 2*(glyph_index - num_of_long_hor_metrics as isize))) as isize;
       }
    }
 }
@@ -1401,7 +1400,7 @@ pub unsafe fn get_glyph_kern_advance(
     glyph1: isize,
     glyph2: isize
 ) -> isize {
-   let data: *mut u8 = (*info).data.offset((*info).kern);
+   let data: *const u8 = (*info).data.as_ptr().offset((*info).kern as isize);
    let needle: u32;
    let mut straw: u32;
    let mut l: isize;
@@ -1474,13 +1473,13 @@ pub unsafe fn get_font_vmetrics(
     line_gap: *mut isize
 ) {
    if ascent != null_mut() {
-       *ascent  = ttSHORT!((*info).data.offset((*info).hhea + 4)) as isize;
+       *ascent  = ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 4)) as isize;
    }
    if descent != null_mut() {
-       *descent = ttSHORT!((*info).data.offset((*info).hhea + 6)) as isize;
+       *descent = ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 6)) as isize;
    }
    if line_gap != null_mut() {
-       *line_gap = ttSHORT!((*info).data.offset((*info).hhea + 8)) as isize;
+       *line_gap = ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 8)) as isize;
    }
 }
 
@@ -1492,10 +1491,10 @@ pub unsafe fn get_font_bounding_box(
     x1: *mut isize,
     y1: *mut isize
 ) {
-   *x0 = ttSHORT!((*info).data.offset((*info).head + 36)) as isize;
-   *y0 = ttSHORT!((*info).data.offset((*info).head + 38)) as isize;
-   *x1 = ttSHORT!((*info).data.offset((*info).head + 40)) as isize;
-   *y1 = ttSHORT!((*info).data.offset((*info).head + 42)) as isize;
+   *x0 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 36)) as isize;
+   *y0 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 38)) as isize;
+   *x1 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 40)) as isize;
+   *y1 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 42)) as isize;
 }
 
 // computes a scale factor to produce a font whose "height" is 'pixels' tall.
@@ -1508,8 +1507,8 @@ pub unsafe fn scale_for_pixel_height(
     info: *const FontInfo,
     height: f32
 ) -> f32 {
-   let fheight = ttSHORT!((*info).data.offset((*info).hhea + 4))
-        - ttSHORT!((*info).data.offset((*info).hhea + 6));
+   let fheight = ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 4))
+        - ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 6));
    return height / fheight as f32;
 }
 
@@ -1520,7 +1519,7 @@ pub unsafe fn scale_for_mapping_em_to_pixels(
     info: *const FontInfo,
     pixels: f32
 ) -> f32 {
-   let units_per_em = ttUSHORT!((*info).data.offset((*info).head + 18));
+   let units_per_em = ttUSHORT!((*info).data.as_ptr().offset((*info).head as isize + 18));
    return pixels / units_per_em as f32;
 }
 
@@ -1636,8 +1635,7 @@ pub struct Hheap
 
 pub unsafe fn hheap_alloc(
     hh: *mut Hheap,
-    size: size_t,
-    _userdata: *const ()
+    size: size_t
 ) -> *const () {
    if (*hh).first_free != null_mut() {
       let p: *mut () = (*hh).first_free;
@@ -1671,7 +1669,7 @@ pub unsafe fn hheap_free(hh: *mut Hheap, p: *mut ()) {
    (*hh).first_free = p;
 }
 
-pub unsafe fn hheap_cleanup(hh: *mut Hheap, _userdata: *const ()) {
+pub unsafe fn hheap_cleanup(hh: *mut Hheap) {
    let mut c: *mut HheapChunk = (*hh).head;
    while c != null_mut() {
       let n: *mut HheapChunk = (*c).next;
@@ -1715,9 +1713,9 @@ pub struct ActiveEdge {
 // #define STBTT_FIXMASK    (STBTT_FIX-1)
 
 /*
-static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, int off_x, float start_point, void *userdata)
+static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, int off_x, float start_point)
 {
-   stbtt__active_edge *z = (stbtt__active_edge *) stbtt__hheap_alloc(hh, sizeof(*z), userdata);
+   stbtt__active_edge *z = (stbtt__active_edge *) stbtt__hheap_alloc(hh, sizeof(*z));
    float dxdy = (e->x1 - e->x0) / (e->y1 - e->y0);
    if (!z) return z;
 
@@ -1741,11 +1739,10 @@ pub unsafe fn new_active(
     hh: *mut Hheap,
     e: *mut Edge,
     off_x: isize,
-    start_point: f32,
-    userdata: *const ()
+    start_point: f32
 ) -> *mut ActiveEdge {
    let z: *mut ActiveEdge = hheap_alloc(
-       hh, size_of::<ActiveEdge>(), userdata)
+       hh, size_of::<ActiveEdge>())
         as *mut ActiveEdge;
    let dxdy: f32 = ((*e).x1 - (*e).x0) / ((*e).y1 - (*e).y0);
    //STBTT_assert(e->y0 <= start_point);
@@ -1812,7 +1809,7 @@ static void stbtt__fill_active_edges(unsigned char *scanline, int len, stbtt__ac
    }
 }
 
-static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e, int n, int vsubsample, int off_x, int off_y, void *userdata)
+static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e, int n, int vsubsample, int off_x, int off_y)
 {
    stbtt__hheap hh = { 0, 0, 0 };
    stbtt__active_edge *active = NULL;
@@ -1822,7 +1819,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
    unsigned char scanline_data[512], *scanline;
 
    if (result->w > 512)
-      scanline = (unsigned char *) STBTT_malloc(result->w, userdata);
+      scanline = (unsigned char *) STBTT_malloc(result->w);
    else
       scanline = scanline_data;
 
@@ -1873,7 +1870,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
          // insert all edges that start before the center of this scanline -- omit ones that also end on this scanline
          while (e->y0 <= scan_y) {
             if (e->y1 > scan_y) {
-               stbtt__active_edge *z = stbtt__new_active(&hh, e, off_x, scan_y, userdata);
+               stbtt__active_edge *z = stbtt__new_active(&hh, e, off_x, scan_y);
                // find insertion point
                if (active == NULL)
                   active = z;
@@ -1904,10 +1901,10 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
       ++j;
    }
 
-   stbtt__hheap_cleanup(&hh, userdata);
+   stbtt__hheap_cleanup(&hh);
 
    if (scanline != scanline_data)
-      STBTT_free(scanline, userdata);
+      STBTT_free(scanline);
 }
 */
 // #elif STBTT_RASTERIZER_VERSION == 2
@@ -2150,8 +2147,7 @@ pub unsafe fn rasterize_sorted_edges(
     n: isize,
     _vsubsample: isize,
     off_x: isize,
-    off_y: isize,
-    userdata: *const ()
+    off_y: isize
 ) {
    let mut hh: Hheap = Hheap {
       head: null_mut(),
@@ -2205,7 +2201,7 @@ pub unsafe fn rasterize_sorted_edges(
       while (*e).y0 <= scan_y_bottom {
          if (*e).y0 != (*e).y1 {
             let z: *mut ActiveEdge = new_active(
-                &mut hh, e, off_x, scan_y_top, userdata);
+                &mut hh, e, off_x, scan_y_top);
             STBTT_assert!((*z).ey >= scan_y_top);
             // insert at front
             (*z).next = active;
@@ -2245,7 +2241,7 @@ pub unsafe fn rasterize_sorted_edges(
       j += 1;
    }
 
-   hheap_cleanup(&mut hh, userdata);
+   hheap_cleanup(&mut hh);
 
    if scanline != scanline_data.as_mut_ptr() {
       STBTT_free!(scanline as *mut c_void);
@@ -2376,8 +2372,7 @@ unsafe fn rasterize_(
     shift_y: f32,
     off_x: isize,
     off_y: isize,
-    invert: isize,
-    userdata: *const ()
+    invert: isize
 ) {
    let y_scale_inv: f32 = if invert != 0 { -scale_y } else { scale_y };
    let e: *mut Edge;
@@ -2439,7 +2434,7 @@ unsafe fn rasterize_(
    sort_edges(e, n);
 
    // now, traverse the scanlines and find the intersections on each scanline, use xor winding rule
-   rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y, userdata);
+   rasterize_sorted_edges(result, e, n, vsubsample, off_x, off_y);
 
    STBTT_free!(e as *mut c_void);
 }
@@ -2494,7 +2489,6 @@ pub unsafe fn flatten_curves(
     objspace_flatness: f32,
     contour_lengths: *mut *mut isize,
     num_contours: *mut isize,
-    _userdata: *const ()
 ) -> *mut Point {
     let mut points: *mut Point = null_mut();
     let mut num_points: isize =0;
@@ -2597,25 +2591,23 @@ pub unsafe fn rasterize(
     x_off: isize,
     y_off: isize,
     // if non-zero, vertically flip shape
-    invert: isize,
-    // context for to STBTT_MALLOC
-    userdata: *const ()
+    invert: isize
 ) {
    let scale: f32 = if scale_x > scale_y { scale_y } else { scale_x };
    let mut winding_count: isize = 0;
    let mut winding_lengths: *mut isize = null_mut();
    let windings: *mut Point = flatten_curves(vertices, num_verts,
-       flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count, userdata);
+       flatness_in_pixels / scale, &mut winding_lengths, &mut winding_count);
    if windings != null_mut() {
       rasterize_(result, windings, winding_lengths, winding_count,
-          scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert, userdata);
+          scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert);
       STBTT_free!(winding_lengths as *mut c_void);
       STBTT_free!(windings as *mut c_void);
    }
 }
 
 // frees the bitmap allocated below
-pub unsafe fn free_bitmap(bitmap: *mut u8, _userdata: *const ())
+pub unsafe fn free_bitmap(bitmap: *mut u8)
 {
    STBTT_free!(bitmap as *mut c_void);
 }
@@ -2669,7 +2661,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
 
          rasterize(&mut gbm, 0.35,
              vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0, iy0,
-              1, (*info).userdata);
+              1);
       }
    }
    STBTT_free!(vertices as *mut c_void);
@@ -2722,7 +2714,7 @@ pub unsafe fn make_glyph_bitmap_subpixel(
 
    if gbm.w != 0 && gbm.h != 0 {
       rasterize(&mut gbm, 0.35, vertices, num_verts,
-          scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1, (*info).userdata);
+          scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1);
    }
 
    STBTT_free!(vertices as *mut c_void);
@@ -2828,33 +2820,17 @@ pub unsafe fn make_codepoint_bitmap(
 // if return is 0, no characters fit and no rows were used
 // This uses a very crappy packing.
 pub unsafe fn bake_font_bitmap(
-    data: *mut u8, offset: isize,  // font location (use offset=0 for plain .ttf)
+    data: &[u8], offset: usize,  // font location (use offset=0 for plain .ttf)
     pixel_height: f32,                     // height of font in pixels
     pixels: *mut u8, pw: isize, ph: isize,  // bitmap to be filled in
     first_char: isize, num_chars: isize,          // characters to bake
     chardata: *mut BakedChar
-) -> isize {
+) -> Result<isize, Error> {
     let scale: f32;
     let mut x: isize;
     let mut y: isize;
     let mut bottom_y: isize;
-    let mut f: FontInfo = FontInfo {
-       userdata: null(),
-       data: null_mut(),
-       fontstart: 0,
-       num_glyphs: 0,
-       loca: 0,
-       head: 0,
-       glyf: 0,
-       hhea: 0,
-       hmtx: 0,
-       kern: 0,
-       index_map: 0,
-       index_to_loc_format: 0,
-    };
-    if init_font(&mut f, data, offset) == 0 {
-         return -1;
-    }
+    let f: FontInfo = try!(FontInfo::new_with_offset(data, offset));
    memset(pixels as *mut _ as *mut c_void, 0, (pw*ph) as usize); // background of 0 around pixels
    x=1;
    y=1;
@@ -2881,7 +2857,7 @@ pub unsafe fn bake_font_bitmap(
          x = 1; // advance to next row
       }
       if y + gh + 1 >= ph { // check if it fits vertically AFTER potentially moving to next row
-         return -i;
+         return Ok(-i);
       }
       STBTT_assert!(x+gw < pw);
       STBTT_assert!(y+gh < ph);
@@ -2898,7 +2874,7 @@ pub unsafe fn bake_font_bitmap(
          bottom_y = y+gh+1;
       }
    }
-   return bottom_y;
+   return Ok(bottom_y);
 }
 
 // Call GetBakedQuad with char_index = 'character - first_char', and it
@@ -3455,27 +3431,12 @@ pub unsafe fn pack_font_ranges_pack_rects(
 // times within a single PackBegin/PackEnd.
 pub unsafe fn pack_font_ranges(
     spc: *mut PackContext,
-    fontdata: *mut u8,
+    fontdata: &[u8],
     font_index: isize,
     ranges: *mut PackRange,
     num_ranges: isize
-) -> isize
+) -> Result<isize, Error>
 {
-   let mut info: FontInfo = FontInfo {
-      userdata: null(),
-      // pointer to .ttf file
-      data: null_mut(),
-      fontstart: 0,
-      num_glyphs: 0,
-      loca: 0,
-      head: 0,
-      glyf: 0,
-      hhea: 0,
-      hmtx: 0,
-      kern: 0,
-      index_map: 0,
-      index_to_loc_format: 0,
-   };
    let mut n: isize;
    //stbrp_context *context = (stbrp_context *) spc->pack_info;
    let rects: *mut Rect;
@@ -3498,10 +3459,10 @@ pub unsafe fn pack_font_ranges(
    rects = STBTT_malloc!(size_of::<Rect>() * n as usize)
         as *mut Rect;
    if rects == null_mut() {
-      return 0;
+      return Ok(0);
    }
 
-   init_font(&mut info, fontdata, get_font_offset_for_index(fontdata,font_index) as isize);
+   let mut info = try!(FontInfo::new_with_offset(fontdata, get_font_offset_for_index(fontdata.as_ptr(),font_index) as usize));
 
    n = pack_font_ranges_gather_rects(spc, &mut info, ranges, num_ranges, rects);
 
@@ -3510,7 +3471,7 @@ pub unsafe fn pack_font_ranges(
    let return_value = pack_font_ranges_render_into_rects(spc, &mut info, ranges, num_ranges, rects);
 
    STBTT_free!(rects as *mut c_void);
-   return return_value;
+   return Ok(return_value);
 }
 
 // Creates character bitmaps from the font_index'th font found in fontdata (use
@@ -3527,13 +3488,13 @@ pub unsafe fn pack_font_ranges(
 //       ..., STBTT_POINT_SIZE(20), ... // 'M' is 20 pixels tall
 pub unsafe fn pack_font_range(
     spc: *mut PackContext,
-    fontdata: *mut u8,
+    fontdata: &[u8],
     font_index: isize,
     font_size: f32,
     first_unicode_codepoint_in_range: isize,
     num_chars_in_range: isize,
     chardata_for_range: *mut PackedChar
-) -> isize {
+) -> Result<isize, Error> {
    let mut range: PackRange = PackRange {
        first_unicode_codepoint_in_range: first_unicode_codepoint_in_range,
        array_of_unicode_codepoints: null(),
@@ -3543,7 +3504,7 @@ pub unsafe fn pack_font_range(
        v_oversample: 0,
        h_oversample: 0,
    };
-   return pack_font_ranges(spc, fontdata, font_index, &mut range, 1);
+   pack_font_ranges(spc, fontdata, font_index, &mut range, 1)
 }
 
 pub unsafe fn get_packed_quad(
@@ -3676,7 +3637,7 @@ pub unsafe fn get_font_name_string(
 ) -> *const u8 {
    let count: i32;
    let string_offset: i32;
-   let fc: *const u8 = (*font).data;
+   let fc: *const u8 = (*font).data.as_ptr();
    let offset: u32 = (*font).fontstart as u32;
    let nm: u32 = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
    if nm == 0 { return null(); }

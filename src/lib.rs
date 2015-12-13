@@ -849,8 +849,8 @@ pub unsafe fn find_glyph_index(
       }
       return 0;
    } else if format == 2 {
-      STBTT_assert!(false); // @TODO: high-byte mapping for japanese/chinese/korean
-      return 0;
+        // @TODO: high-byte mapping for japanese/chinese/korean
+        unimplemented!();
    } else if format == 4 { // standard mapping for windows fonts: binary search collection of ranges
       let segcount: u16 = ttUSHORT!(data.offset(index_map as isize +6)) >> 1;
       let mut search_range: u16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
@@ -939,8 +939,7 @@ pub unsafe fn find_glyph_index(
       return 0; // not found
    }
    // @TODO
-   STBTT_assert!(false);
-   return 0;
+   unimplemented!();
 }
 
 pub unsafe fn get_codepoint_shape(
@@ -1275,7 +1274,7 @@ pub unsafe fn get_glyph_shape(
          }
          else {
             // @TODO handle matching point
-            STBTT_assert!(false);
+            unimplemented!();
          }
          if (flags & (1<<3)) != 0 { // WE_HAVE_A_SCALE
              let v = ttSHORT!(comp) as f32 /16384.0; comp=comp.offset(2);
@@ -1337,8 +1336,8 @@ pub unsafe fn get_glyph_shape(
          more = (flags & (1<<5)) as isize;
       }
    } else if number_of_contours < 0 {
-      // @TODO other compound variations?
-      STBTT_assert!(false);
+        // @TODO other compound variations?
+        unimplemented!();
    } else {
       // numberOfCounters == 0, do nothing
    }

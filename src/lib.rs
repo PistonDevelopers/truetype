@@ -251,19 +251,11 @@ use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
 
-macro_rules! STBTT_ifloor {
-    ($x:expr) => {
-        $x.floor() as isize
-    }
-}
-
-macro_rules! STBTT_ifloor {
-    ($x:expr) => {
-        $x.floor() as isize
-    }
-}
 
 //   #define STBTT_ifloor(x)   ((int) floor(x))
+fn ifloor(x: f32) -> isize {
+    x.floor() as isize
+}
 
 macro_rules! STBTT_iceil {
     ($x:expr) => {
@@ -1563,8 +1555,8 @@ pub unsafe fn get_glyph_bitmap_box_subpixel(
       if iy1 != null_mut() { *iy1 = 0; }
    } else {
       // move to integral bboxes (treating pixels as little squares, what pixels get touched)?
-      if ix0 != null_mut() { *ix0 = STBTT_ifloor!( x0 as f32 * scale_x + shift_x); }
-      if iy0 != null_mut() { *iy0 = STBTT_ifloor!(-y1 as f32 * scale_y + shift_y); }
+      if ix0 != null_mut() { *ix0 = ifloor( x0 as f32 * scale_x + shift_x); }
+      if iy0 != null_mut() { *iy0 = ifloor(-y1 as f32 * scale_y + shift_y); }
       if ix1 != null_mut() { *ix1 = STBTT_iceil! ( x1 as f32 * scale_x + shift_x); }
       if iy1 != null_mut() { *iy1 = STBTT_iceil! (-y0 as f32 * scale_y + shift_y); }
    }
@@ -2903,8 +2895,8 @@ pub unsafe fn get_baked_quad(
    let ipw: f32 = 1.0 / pw as f32;
    let iph = 1.0 / ph as f32;
    let b: *mut BakedChar = chardata.offset(char_index);
-   let round_x: isize = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5);
-   let round_y: isize = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5);
+   let round_x = ifloor((*xpos + (*b).xoff) + 0.5);
+   let round_y = ifloor((*ypos + (*b).yoff) + 0.5);
 
    (*q).x0 = round_x as f32 + d3d_bias;
    (*q).y0 = round_y as f32 + d3d_bias;
@@ -3525,8 +3517,8 @@ pub unsafe fn get_packed_quad(
    let b: *const PackedChar = chardata.offset(char_index);
 
    if align_to_integer != 0 {
-      let x: f32 = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5) as f32;
-      let y: f32 = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5) as f32;
+      let x = ((*xpos + (*b).xoff) + 0.5).floor();
+      let y = ((*ypos + (*b).yoff) + 0.5).floor();
       (*q).x0 = x;
       (*q).y0 = y;
       (*q).x1 = x + (*b).xoff2 - (*b).xoff;

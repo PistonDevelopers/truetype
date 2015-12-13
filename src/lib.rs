@@ -251,6 +251,9 @@ use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
 
+mod error;
+
+pub use error::Error;
 
 //   #define STBTT_ifloor(x)   ((int) floor(x))
 fn ifloor(x: f32) -> isize {
@@ -417,11 +420,6 @@ pub struct FontInfo<'a> {
    index_map: usize,
    // format needed to map from glyph index to glyph
    index_to_loc_format: usize,
-}
-
-pub enum Error {
-    Malformed,
-    MissingTable,
 }
 
 impl<'a> FontInfo<'a> {

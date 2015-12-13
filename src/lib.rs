@@ -257,14 +257,6 @@ fn ifloor(x: f32) -> isize {
     x.floor() as isize
 }
 
-macro_rules! STBTT_sqrt {
-    ($x:expr) => {
-        $x.sqrt()
-    }
-}
-
-//   #define STBTT_sqrt(x)      sqrt(x)
-
 macro_rules! STBTT_malloc {
     ($x:expr) => {
         malloc($x)
@@ -1304,8 +1296,8 @@ pub unsafe fn get_glyph_shape(
          }
 
          // Find transformation scales.
-         m = STBTT_sqrt!(mtx[0]*mtx[0] + mtx[1]*mtx[1]) as f32;
-         n = STBTT_sqrt!(mtx[2]*mtx[2] + mtx[3]*mtx[3]) as f32;
+         m = (mtx[0]*mtx[0] + mtx[1]*mtx[1]).sqrt();
+         n = (mtx[2]*mtx[2] + mtx[3]*mtx[3]).sqrt();
 
          // Get indexed glyph.
          comp_num_verts = get_glyph_shape(info, gidx as isize, &mut comp_verts);

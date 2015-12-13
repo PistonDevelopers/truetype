@@ -257,13 +257,6 @@ fn ifloor(x: f32) -> isize {
     x.floor() as isize
 }
 
-macro_rules! STBTT_iceil {
-    ($x:expr) => {
-        $x.ceil() as isize
-    }
-}
-//   #define STBTT_iceil(x)    ((int) ceil(x))
-
 macro_rules! STBTT_sqrt {
     ($x:expr) => {
         $x.sqrt()
@@ -1557,8 +1550,8 @@ pub unsafe fn get_glyph_bitmap_box_subpixel(
       // move to integral bboxes (treating pixels as little squares, what pixels get touched)?
       if ix0 != null_mut() { *ix0 = ifloor( x0 as f32 * scale_x + shift_x); }
       if iy0 != null_mut() { *iy0 = ifloor(-y1 as f32 * scale_y + shift_y); }
-      if ix1 != null_mut() { *ix1 = STBTT_iceil! ( x1 as f32 * scale_x + shift_x); }
-      if iy1 != null_mut() { *iy1 = STBTT_iceil! (-y0 as f32 * scale_y + shift_y); }
+      if ix1 != null_mut() { *ix1 = ( x1 as f32 * scale_x + shift_x).ceil() as isize; }
+      if iy1 != null_mut() { *iy1 = (-y0 as f32 * scale_y + shift_y).ceil() as isize; }
    }
 }
 

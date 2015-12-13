@@ -251,34 +251,14 @@ use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
 
-macro_rules! STBTT_ifloor {
-    ($x:expr) => {
-        $x.floor() as isize
-    }
-}
+mod error;
 
-macro_rules! STBTT_ifloor {
-    ($x:expr) => {
-        $x.floor() as isize
-    }
-}
+pub use error::Error;
 
 //   #define STBTT_ifloor(x)   ((int) floor(x))
-
-macro_rules! STBTT_iceil {
-    ($x:expr) => {
-        $x.ceil() as isize
-    }
+fn ifloor(x: f32) -> isize {
+    x.floor() as isize
 }
-//   #define STBTT_iceil(x)    ((int) ceil(x))
-
-macro_rules! STBTT_sqrt {
-    ($x:expr) => {
-        $x.sqrt()
-    }
-}
-
-//   #define STBTT_sqrt(x)      sqrt(x)
 
 macro_rules! STBTT_malloc {
     ($x:expr) => {
@@ -440,11 +420,6 @@ pub struct FontInfo<'a> {
    index_map: usize,
    // format needed to map from glyph index to glyph
    index_to_loc_format: usize,
-}
-
-pub enum Error {
-    Malformed,
-    MissingTable,
 }
 
 impl<'a> FontInfo<'a> {
@@ -872,8 +847,8 @@ pub unsafe fn find_glyph_index(
       }
       return 0;
    } else if format == 2 {
-      STBTT_assert!(false); // @TODO: high-byte mapping for japanese/chinese/korean
-      return 0;
+        // @TODO: high-byte mapping for japanese/chinese/korean
+        unimplemented!();
    } else if format == 4 { // standard mapping for windows fonts: binary search collection of ranges
       let segcount: u16 = ttUSHORT!(data.offset(index_map as isize +6)) >> 1;
       let mut search_range: u16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
@@ -962,8 +937,7 @@ pub unsafe fn find_glyph_index(
       return 0; // not found
    }
    // @TODO
-   STBTT_assert!(false);
-   return 0;
+   unimplemented!();
 }
 
 pub unsafe fn get_codepoint_shape(
@@ -1298,7 +1272,7 @@ pub unsafe fn get_glyph_shape(
          }
          else {
             // @TODO handle matching point
-            STBTT_assert!(false);
+            unimplemented!();
          }
          if (flags & (1<<3)) != 0 { // WE_HAVE_A_SCALE
              let v = ttSHORT!(comp) as f32 /16384.0; comp=comp.offset(2);
@@ -1319,8 +1293,8 @@ pub unsafe fn get_glyph_shape(
          }
 
          // Find transformation scales.
-         m = STBTT_sqrt!(mtx[0]*mtx[0] + mtx[1]*mtx[1]) as f32;
-         n = STBTT_sqrt!(mtx[2]*mtx[2] + mtx[3]*mtx[3]) as f32;
+         m = (mtx[0]*mtx[0] + mtx[1]*mtx[1]).sqrt();
+         n = (mtx[2]*mtx[2] + mtx[3]*mtx[3]).sqrt();
 
          // Get indexed glyph.
          comp_num_verts = get_glyph_shape(info, gidx as isize, &mut comp_verts);
@@ -1360,8 +1334,8 @@ pub unsafe fn get_glyph_shape(
          more = (flags & (1<<5)) as isize;
       }
    } else if number_of_contours < 0 {
-      // @TODO other compound variations?
-      STBTT_assert!(false);
+        // @TODO other compound variations?
+        unimplemented!();
    } else {
       // numberOfCounters == 0, do nothing
    }
@@ -1563,10 +1537,10 @@ pub unsafe fn get_glyph_bitmap_box_subpixel(
       if iy1 != null_mut() { *iy1 = 0; }
    } else {
       // move to integral bboxes (treating pixels as little squares, what pixels get touched)?
-      if ix0 != null_mut() { *ix0 = STBTT_ifloor!( x0 as f32 * scale_x + shift_x); }
-      if iy0 != null_mut() { *iy0 = STBTT_ifloor!(-y1 as f32 * scale_y + shift_y); }
-      if ix1 != null_mut() { *ix1 = STBTT_iceil! ( x1 as f32 * scale_x + shift_x); }
-      if iy1 != null_mut() { *iy1 = STBTT_iceil! (-y0 as f32 * scale_y + shift_y); }
+      if ix0 != null_mut() { *ix0 = ifloor( x0 as f32 * scale_x + shift_x); }
+      if iy0 != null_mut() { *iy0 = ifloor(-y1 as f32 * scale_y + shift_y); }
+      if ix1 != null_mut() { *ix1 = ( x1 as f32 * scale_x + shift_x).ceil() as isize; }
+      if iy1 != null_mut() { *iy1 = (-y0 as f32 * scale_y + shift_y).ceil() as isize; }
    }
 }
 
@@ -2903,8 +2877,8 @@ pub unsafe fn get_baked_quad(
    let ipw: f32 = 1.0 / pw as f32;
    let iph = 1.0 / ph as f32;
    let b: *mut BakedChar = chardata.offset(char_index);
-   let round_x: isize = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5);
-   let round_y: isize = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5);
+   let round_x = ifloor((*xpos + (*b).xoff) + 0.5);
+   let round_y = ifloor((*ypos + (*b).yoff) + 0.5);
 
    (*q).x0 = round_x as f32 + d3d_bias;
    (*q).y0 = round_y as f32 + d3d_bias;
@@ -3525,8 +3499,8 @@ pub unsafe fn get_packed_quad(
    let b: *const PackedChar = chardata.offset(char_index);
 
    if align_to_integer != 0 {
-      let x: f32 = STBTT_ifloor!((*xpos + (*b).xoff) + 0.5) as f32;
-      let y: f32 = STBTT_ifloor!((*ypos + (*b).yoff) + 0.5) as f32;
+      let x = ((*xpos + (*b).xoff) + 0.5).floor();
+      let y = ((*ypos + (*b).yoff) + 0.5).floor();
       (*q).x0 = x;
       (*q).y0 = y;
       (*q).x1 = x + (*b).xoff2 - (*b).xoff;

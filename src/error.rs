@@ -1,11 +1,14 @@
 
 use std::fmt;
+use byteorder;
 
 /// An Error type.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum Error {
     Malformed,
     MissingTable,
+    HHEAVersionNotSupported,
+    Byteorder(byteorder::Error),
 }
 
 impl fmt::Display for Error {
@@ -20,6 +23,14 @@ impl ::std::error::Error for Error {
         match *self {
             Error::Malformed => "malformed data",
             Error::MissingTable => "missing table",
+            Error::HHEAVersionNotSupported => "hhea version is not supported",
+            Error::Byteorder(_) => "byteorder error",
         }
+    }
+}
+
+impl From<byteorder::Error> for Error {
+    fn from(e: byteorder::Error) -> Self {
+        Error::Byteorder(e)
     }
 }

@@ -250,8 +250,10 @@ use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
+use tables::HHEA;
 
 mod error;
+mod tables;
 
 pub use error::Error;
 

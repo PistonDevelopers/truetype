@@ -57,3 +57,21 @@ impl HHEA {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SIZE: usize = 16 * 2 + 4;
+    const OFFSET: usize = 340;
+
+    #[test]
+    fn runner() {
+        let data = super::super::read_file("tests/Tuffy_Bold.ttf");
+        success_read(&data);
+    }
+
+    fn success_read(data: &[u8]) {
+        let _ = HHEA::from_data(&data[OFFSET..OFFSET + SIZE]).unwrap();
+    }
+}
+

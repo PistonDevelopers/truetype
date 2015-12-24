@@ -257,6 +257,8 @@ mod tables;
 
 pub use error::Error;
 
+pub type Result<T> = ::std::result::Result<T, Error>;
+
 //   #define STBTT_ifloor(x)   ((int) floor(x))
 fn ifloor(x: f32) -> isize {
     x.floor() as isize
@@ -427,7 +429,7 @@ pub struct FontInfo<'a> {
 impl<'a> FontInfo<'a> {
     // Given an offset into the file that defines a font, this function builds
     // the necessary cached info for the rest of the system.
-    pub fn new_with_offset(data: &[u8], fontstart: usize) -> Result<FontInfo, Error> {
+    pub fn new_with_offset(data: &[u8], fontstart: usize) -> Result<FontInfo> {
         let mut info = FontInfo{
             data: data,
             fontstart: 0,
@@ -500,28 +502,28 @@ impl<'a> FontInfo<'a> {
         Ok(info)
     }
 
-    fn read_u16(&self, offset: usize) -> Result<u16, Error> {
+    fn read_u16(&self, offset: usize) -> Result<u16> {
         if offset + 2 > self.data.len() {
             return Err(Error::Malformed);
         }
         Ok(BigEndian::read_u16(&self.data[offset..offset + 2]))
     }
 
-    fn read_i16(&self, offset: usize) -> Result<i16, Error> {
+    fn read_i16(&self, offset: usize) -> Result<i16> {
         if offset + 2 > self.data.len() {
             return Err(Error::Malformed);
         }
         Ok(BigEndian::read_i16(&self.data[offset..offset + 2]))
     }
 
-    fn find_required_table(&self, tag: &[u8; 4]) -> Result<usize, Error> {
+    fn find_required_table(&self, tag: &[u8; 4]) -> Result<usize> {
         match try!(self.find_table(tag)) {
             Some(offset) => Ok(offset),
             None => Err(Error::MissingTable)
         }
     }
 
-    fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>, Error> {
+    fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>> {
         let num_tables = try!(self.read_u16(self.fontstart + 4)) as usize;
         let tabledir: usize = self.fontstart + 12;
 
@@ -542,7 +544,7 @@ impl<'a> FontInfo<'a> {
     // and computing:
     //       scale = pixels / (ascent - descent)
     // so if you prefer to measure height by the ascent only, use a similar calculation.
-    pub fn scale_for_pixel_height(&self, height: f32) -> Result<f32, Error> {
+    pub fn scale_for_pixel_height(&self, height: f32) -> Result<f32> {
         let ascent = try!(self.read_i16(self.hhea + 4));
         let descent = try!(self.read_i16(self.hhea + 6));
         Ok(height / (ascent - descent) as f32)
@@ -2804,7 +2806,7 @@ pub unsafe fn bake_font_bitmap(
     pixels: *mut u8, pw: isize, ph: isize,  // bitmap to be filled in
     first_char: isize, num_chars: isize,          // characters to bake
     chardata: *mut BakedChar
-) -> Result<isize, Error> {
+) -> Result<isize> {
     let scale: f32;
     let mut x: isize;
     let mut y: isize;
@@ -3422,7 +3424,7 @@ pub unsafe fn pack_font_ranges(
     font_index: isize,
     ranges: *mut PackRange,
     num_ranges: isize
-) -> Result<isize, Error>
+) -> Result<isize>
 {
    let mut n: isize;
    //stbrp_context *context = (stbrp_context *) spc->pack_info;
@@ -3481,7 +3483,7 @@ pub unsafe fn pack_font_range(
     first_unicode_codepoint_in_range: isize,
     num_chars_in_range: isize,
     chardata_for_range: *mut PackedChar
-) -> Result<isize, Error> {
+) -> Result<isize> {
    let mut range: PackRange = PackRange {
        first_unicode_codepoint_in_range: first_unicode_codepoint_in_range,
        array_of_unicode_codepoints: null(),

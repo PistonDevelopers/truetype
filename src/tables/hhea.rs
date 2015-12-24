@@ -1,6 +1,7 @@
 
 use super::Fixed;
-use super::super::Error;
+use Error;
+use Result;
 use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -26,7 +27,7 @@ pub struct HHEA {
 }
 
 impl HHEA {
-    pub fn from_data(data: &[u8]) -> Result<HHEA, Error> {
+    pub fn from_data(data: &[u8]) -> Result<HHEA> {
         let mut cursor = Cursor::new(data);
         let version = Fixed(try!(cursor.read_i32::<BigEndian>()));
         if version != Fixed(0x00010000) {

@@ -7,7 +7,7 @@ use byteorder;
 pub enum Error {
     Malformed,
     MissingTable,
-    HHEAVersionNotSupported,
+    HHEAVersionIsNotSupported,
     Byteorder(byteorder::Error),
 }
 
@@ -23,7 +23,7 @@ impl ::std::error::Error for Error {
         match *self {
             Error::Malformed => "malformed data",
             Error::MissingTable => "missing table",
-            Error::HHEAVersionNotSupported => "hhea version is not supported",
+            Error::HHEAVersionIsNotSupported => "hhea version is not supported",
             Error::Byteorder(_) => "byteorder error",
         }
     }

@@ -31,7 +31,7 @@ impl HHEA {
         let mut cursor = Cursor::new(data);
         let version = Fixed(try!(cursor.read_i32::<BigEndian>()));
         if version != Fixed(0x00010000) {
-            return Err(Error::HHEAVersionNotSupported);
+            return Err(Error::HHEAVersionIsNotSupported);
         }
 
         let mut hhea = HHEA::default();
@@ -106,7 +106,7 @@ mod tests {
         let mut data = data.to_owned();
         data[1] = 2;
         match HHEA::from_data(&data) {
-            Err(::Error::HHEAVersionNotSupported) => (),
+            Err(::Error::HHEAVersionIsNotSupported) => (),
             _ => panic!("should handle version mismatch"),
         }
     }

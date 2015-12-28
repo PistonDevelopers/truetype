@@ -94,6 +94,7 @@ mod tests {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
         test_read_write(&data);
         test_version_mismatch(&data);
+        test_read_not_enough_data(&data);
     }
 
     fn test_read_write(data: &[u8]) {
@@ -107,7 +108,14 @@ mod tests {
         data[1] = 2;
         match HHEA::from_data(&data) {
             Err(::Error::HHEAVersionIsNotSupported) => (),
-            _ => panic!("should handle version mismatch"),
+            _ => panic!("should return error on version mismatch"),
+        }
+    }
+
+    fn test_read_not_enough_data(data: &[u8]) {
+        match HHEA::from_data(&data[..SIZE - 1]) {
+            Err(_) => (),
+            _ => panic!("should return error if not enough data"),
         }
     }
 }

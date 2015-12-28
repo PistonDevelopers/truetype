@@ -5,6 +5,15 @@ use Result;
 use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
 
+/// A horizontal header.
+///
+/// This table contains information needed to layout fonts whose characters
+/// are written horizontally, that is, either left to right or right to left.
+///
+/// The table provides such properties as: `ascent`, `descent` and `line_gap`,
+/// these are expressed in unscaled coordinates, so you must multiply by
+/// the scale factor for a given size. You can advance the vertical position by
+/// `ascent - descent + line_gap`.
 #[derive(Debug, Default)]
 pub struct HHEA {
     version: Fixed,
@@ -27,6 +36,14 @@ pub struct HHEA {
 }
 
 impl HHEA {
+    /// Returns `hhea` font table.
+    ///
+    /// Attempts to read `data` starting from zero position, so you should
+    /// provide a correct offset.
+    ///
+    /// # Errors
+    /// Returns error if there is not enough data to read or version of
+    /// the `hhea` font table is not supported.
     pub fn from_data(data: &[u8]) -> Result<HHEA> {
         let mut cursor = Cursor::new(data);
         let version = Fixed(try!(cursor.read_i32::<BigEndian>()));
@@ -79,6 +96,27 @@ impl HHEA {
         data.write_i16::<BigEndian>(self.metric_data_format).unwrap();
         data.write_u16::<BigEndian>(self.num_of_long_hor_metrics).unwrap();
         data
+    }
+
+    /// Distance from baseline of highest ascender.
+    pub fn ascent(&self) -> i32 {
+        self.ascent as i32
+    }
+
+    /// Distance from baseline of lowest descender (i.e. it is typically negative).
+    pub fn descent(&self) -> i32 {
+        self.descent as i32
+    }
+
+    /// The spacing between one row's descent and the next row's ascent.
+    #[allow(dead_code)]
+    pub fn line_gap(&self) -> i32 {
+        self.line_gap as i32
+    }
+
+    /// The number of advance widths in metrics table.
+    pub fn num_of_long_hor_metrics(&self) -> u32 {
+        self.num_of_long_hor_metrics as u32
     }
 }
 

@@ -93,12 +93,22 @@ mod tests {
     fn runner() {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
         test_read_write(&data);
+        test_version_mismatch(&data);
     }
 
     fn test_read_write(data: &[u8]) {
         let data = &data[OFFSET..OFFSET + SIZE];
         let hhea = HHEA::from_data(data).unwrap();
         assert_eq!(hhea.bytes(), data);
+    }
+
+    fn test_version_mismatch(data: &[u8]) {
+        let mut data = data.to_owned();
+        data[1] = 2;
+        match HHEA::from_data(&data) {
+            Err(::Error::HHEAVersionNotSupported) => (),
+            _ => panic!("should handle version mismatch"),
+        }
     }
 }
 

@@ -540,8 +540,8 @@ impl<'a> FontInfo<'a> {
     // and computing:
     //       scale = pixels / (ascent - descent)
     // so if you prefer to measure height by the ascent only, use a similar calculation.
-    pub fn scale_for_pixel_height(&self, height: f32) -> Result<f32> {
-        Ok(height / (self.hhea.ascent() - self.hhea.descent()) as f32)
+    pub fn scale_for_pixel_height(&self, height: f32) -> f32 {
+        height / (self.hhea.ascent() - self.hhea.descent()) as f32
     }
 }
 
@@ -2788,8 +2788,7 @@ pub unsafe fn bake_font_bitmap(
    y=1;
    bottom_y = 1;
 
-    // TODO: proper error handling.
-    scale = f.scale_for_pixel_height(pixel_height).unwrap();
+    scale = f.scale_for_pixel_height(pixel_height);
 
    for i in 0..num_chars {
       let mut advance: isize = 0;
@@ -3236,8 +3235,7 @@ pub unsafe fn pack_font_ranges_gather_rects(
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
         let scale = if fh > 0.0 {
-            // TODO: proper error handling.
-            (*info).scale_for_pixel_height(fh).unwrap()
+            (*info).scale_for_pixel_height(fh)
         } else {
             scale_for_mapping_em_to_pixels(info, -fh)
         };
@@ -3287,8 +3285,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
         let scale = if fh > 0.0 {
-            // TODO: proper error handling.
-            (*info).scale_for_pixel_height(fh).unwrap()
+            (*info).scale_for_pixel_height(fh)
         } else {
             scale_for_mapping_em_to_pixels(info, -fh)
         };

@@ -250,10 +250,14 @@ use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
+use tables::HHEA;
 
 mod error;
+mod tables;
 
 pub use error::Error;
+
+pub type Result<T> = ::std::result::Result<T, Error>;
 
 //   #define STBTT_ifloor(x)   ((int) floor(x))
 fn ifloor(x: f32) -> isize {
@@ -409,11 +413,12 @@ pub struct FontInfo<'a> {
    // number of glyphs, needed for range checking
    num_glyphs: usize,
 
+   hhea: HHEA,
+
    // table locations as offset from start of .ttf
    loca: usize,
    head: usize,
    glyf: usize,
-   hhea: usize,
    hmtx: usize,
    kern: usize,
    // a cmap mapping for our chosen character encoding
@@ -425,15 +430,15 @@ pub struct FontInfo<'a> {
 impl<'a> FontInfo<'a> {
     // Given an offset into the file that defines a font, this function builds
     // the necessary cached info for the rest of the system.
-    pub fn new_with_offset(data: &[u8], fontstart: usize) -> Result<FontInfo, Error> {
+    pub fn new_with_offset(data: &[u8], fontstart: usize) -> Result<FontInfo> {
         let mut info = FontInfo{
             data: data,
             fontstart: 0,
             num_glyphs: 0,
+            hhea: HHEA::default(),
             loca: 0,
             head: 0,
             glyf: 0,
-            hhea: 0,
             hmtx: 0,
             kern: 0,
             index_map: 0,
@@ -442,11 +447,13 @@ impl<'a> FontInfo<'a> {
 
         info.fontstart = fontstart;
 
+        let hhea_offset = try!(info.find_required_table(b"hhea"));
+        info.hhea = try!(HHEA::from_data(&data[hhea_offset..]));
+
         let cmap = try!(info.find_required_table(b"cmap"));
         info.loca = try!(info.find_required_table(b"loca"));
         info.head = try!(info.find_required_table(b"head"));
         info.glyf = try!(info.find_required_table(b"glyf"));
-        info.hhea = try!(info.find_required_table(b"hhea"));
         info.hmtx = try!(info.find_required_table(b"hmtx"));
         info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
 
@@ -498,28 +505,21 @@ impl<'a> FontInfo<'a> {
         Ok(info)
     }
 
-    fn read_u16(&self, offset: usize) -> Result<u16, Error> {
+    fn read_u16(&self, offset: usize) -> Result<u16> {
         if offset + 2 > self.data.len() {
             return Err(Error::Malformed);
         }
         Ok(BigEndian::read_u16(&self.data[offset..offset + 2]))
     }
 
-    fn read_i16(&self, offset: usize) -> Result<i16, Error> {
-        if offset + 2 > self.data.len() {
-            return Err(Error::Malformed);
-        }
-        Ok(BigEndian::read_i16(&self.data[offset..offset + 2]))
-    }
-
-    fn find_required_table(&self, tag: &[u8; 4]) -> Result<usize, Error> {
+    fn find_required_table(&self, tag: &[u8; 4]) -> Result<usize> {
         match try!(self.find_table(tag)) {
             Some(offset) => Ok(offset),
             None => Err(Error::MissingTable)
         }
     }
 
-    fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>, Error> {
+    fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>> {
         let num_tables = try!(self.read_u16(self.fontstart + 4)) as usize;
         let tabledir: usize = self.fontstart + 12;
 
@@ -540,10 +540,8 @@ impl<'a> FontInfo<'a> {
     // and computing:
     //       scale = pixels / (ascent - descent)
     // so if you prefer to measure height by the ascent only, use a similar calculation.
-    pub fn scale_for_pixel_height(&self, height: f32) -> Result<f32, Error> {
-        let ascent = try!(self.read_i16(self.hhea + 4));
-        let descent = try!(self.read_i16(self.hhea + 6));
-        Ok(height / (ascent - descent) as f32)
+    pub fn scale_for_pixel_height(&self, height: f32) -> f32 {
+        height / (self.hhea.ascent() - self.hhea.descent()) as f32
     }
 }
 
@@ -1368,7 +1366,7 @@ pub unsafe fn get_glyph_hmetrics(
     advance_width: *mut isize,
     left_side_bearing: *mut isize
 ) {
-   let num_of_long_hor_metrics: u16 = ttUSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 34));
+   let num_of_long_hor_metrics = (*info).hhea.num_of_long_hor_metrics();
    if glyph_index < num_of_long_hor_metrics as isize {
       if advance_width != null_mut() {
           *advance_width    = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*glyph_index)) as isize;
@@ -1450,29 +1448,6 @@ pub unsafe fn get_codepoint_hmetrics(
     left_side_bearing: *mut isize
 ) {
    get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
-}
-
-// ascent is the coordinate above the baseline the font extends; descent
-// is the coordinate below the baseline the font extends (i.e. it is typically negative)
-// lineGap is the spacing between one row's descent and the next row's ascent...
-// so you should advance the vertical position by "*ascent - *descent + *lineGap"
-//   these are expressed in unscaled coordinates, so you must multiply by
-//   the scale factor for a given size
-pub unsafe fn get_font_vmetrics(
-    info: *const FontInfo,
-    ascent: *mut isize,
-    descent: *mut isize,
-    line_gap: *mut isize
-) {
-   if ascent != null_mut() {
-       *ascent  = ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 4)) as isize;
-   }
-   if descent != null_mut() {
-       *descent = ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 6)) as isize;
-   }
-   if line_gap != null_mut() {
-       *line_gap = ttSHORT!((*info).data.as_ptr().offset((*info).hhea as isize + 8)) as isize;
-   }
 }
 
 // the bounding box around all possible characters
@@ -2802,7 +2777,7 @@ pub unsafe fn bake_font_bitmap(
     pixels: *mut u8, pw: isize, ph: isize,  // bitmap to be filled in
     first_char: isize, num_chars: isize,          // characters to bake
     chardata: *mut BakedChar
-) -> Result<isize, Error> {
+) -> Result<isize> {
     let scale: f32;
     let mut x: isize;
     let mut y: isize;
@@ -2813,8 +2788,7 @@ pub unsafe fn bake_font_bitmap(
    y=1;
    bottom_y = 1;
 
-    // TODO: proper error handling.
-    scale = f.scale_for_pixel_height(pixel_height).unwrap();
+    scale = f.scale_for_pixel_height(pixel_height);
 
    for i in 0..num_chars {
       let mut advance: isize = 0;
@@ -3261,8 +3235,7 @@ pub unsafe fn pack_font_ranges_gather_rects(
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
         let scale = if fh > 0.0 {
-            // TODO: proper error handling.
-            (*info).scale_for_pixel_height(fh).unwrap()
+            (*info).scale_for_pixel_height(fh)
         } else {
             scale_for_mapping_em_to_pixels(info, -fh)
         };
@@ -3312,8 +3285,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
    for i in 0..num_ranges {
       let fh: f32 = (*ranges.offset(i)).font_size;
         let scale = if fh > 0.0 {
-            // TODO: proper error handling.
-            (*info).scale_for_pixel_height(fh).unwrap()
+            (*info).scale_for_pixel_height(fh)
         } else {
             scale_for_mapping_em_to_pixels(info, -fh)
         };
@@ -3420,7 +3392,7 @@ pub unsafe fn pack_font_ranges(
     font_index: isize,
     ranges: *mut PackRange,
     num_ranges: isize
-) -> Result<isize, Error>
+) -> Result<isize>
 {
    let mut n: isize;
    //stbrp_context *context = (stbrp_context *) spc->pack_info;
@@ -3479,7 +3451,7 @@ pub unsafe fn pack_font_range(
     first_unicode_codepoint_in_range: isize,
     num_chars_in_range: isize,
     chardata_for_range: *mut PackedChar
-) -> Result<isize, Error> {
+) -> Result<isize> {
    let mut range: PackRange = PackRange {
        first_unicode_codepoint_in_range: first_unicode_codepoint_in_range,
        array_of_unicode_codepoints: null(),

@@ -8,6 +8,7 @@ pub enum Error {
     Malformed,
     MissingTable,
     HHEAVersionIsNotSupported,
+    HEADVersionIsNotSupported,
     Byteorder(byteorder::Error),
 }
 
@@ -24,6 +25,7 @@ impl ::std::error::Error for Error {
             Error::Malformed => "malformed data",
             Error::MissingTable => "missing table",
             Error::HHEAVersionIsNotSupported => "hhea version is not supported",
+            Error::HEADVersionIsNotSupported => "head version is not supported",
             Error::Byteorder(_) => "byteorder error",
         }
     }

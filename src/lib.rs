@@ -250,10 +250,11 @@ use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::HHEA;
+use tables::{HHEA, HEAD};
 
 mod error;
 mod tables;
+mod types;
 
 pub use error::Error;
 
@@ -1448,20 +1449,6 @@ pub unsafe fn get_codepoint_hmetrics(
     left_side_bearing: *mut isize
 ) {
    get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
-}
-
-// the bounding box around all possible characters
-pub unsafe fn get_font_bounding_box(
-    info: *const FontInfo,
-    x0: *mut isize,
-    y0: *mut isize,
-    x1: *mut isize,
-    y1: *mut isize
-) {
-   *x0 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 36)) as isize;
-   *y0 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 38)) as isize;
-   *x1 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 40)) as isize;
-   *y1 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 42)) as isize;
 }
 
 // computes a scale factor to produce a font whose EM size is mapped to

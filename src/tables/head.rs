@@ -2,6 +2,7 @@
 use super::Fixed;
 use Error;
 use Result;
+use types::BBox;
 use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -93,6 +94,17 @@ impl HEAD {
         data.write_i16::<BigEndian>(self.index_to_loc_format).unwrap();
         data.write_i16::<BigEndian>(self.glyph_data_format).unwrap();
         data
+    }
+
+    /// Returns the bounding box around all possible characters.
+    #[allow(dead_code)]
+    pub fn bounding_box(&self) -> BBox {
+        BBox {
+            x0: self.x_min as i32,
+            y0: self.y_min as i32,
+            x1: self.x_max as i32,
+            y1: self.y_max as i32
+        }
     }
 }
 

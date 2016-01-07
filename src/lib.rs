@@ -415,17 +415,15 @@ pub struct FontInfo<'a> {
    num_glyphs: usize,
 
    hhea: HHEA,
+   head: HEAD,
 
    // table locations as offset from start of .ttf
    loca: usize,
-   head: usize,
    glyf: usize,
    hmtx: usize,
    kern: usize,
    // a cmap mapping for our chosen character encoding
    index_map: usize,
-   // format needed to map from glyph index to glyph
-   index_to_loc_format: usize,
 }
 
 impl<'a> FontInfo<'a> {
@@ -437,23 +435,23 @@ impl<'a> FontInfo<'a> {
             fontstart: 0,
             num_glyphs: 0,
             hhea: HHEA::default(),
+            head: HEAD::default(),
             loca: 0,
-            head: 0,
             glyf: 0,
             hmtx: 0,
             kern: 0,
             index_map: 0,
-            index_to_loc_format: 0,
         };
 
         info.fontstart = fontstart;
 
         let hhea_offset = try!(info.find_required_table(b"hhea"));
         info.hhea = try!(HHEA::from_data(&data[hhea_offset..]));
+        let head_offset = try!(info.find_required_table(b"head"));
+        info.head = try!(HEAD::from_data(&data, head_offset));
 
         let cmap = try!(info.find_required_table(b"cmap"));
         info.loca = try!(info.find_required_table(b"loca"));
-        info.head = try!(info.find_required_table(b"head"));
         info.glyf = try!(info.find_required_table(b"glyf"));
         info.hmtx = try!(info.find_required_table(b"hmtx"));
         info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
@@ -500,8 +498,6 @@ impl<'a> FontInfo<'a> {
         if info.index_map == 0 {
             return Err(Error::MissingTable);
         }
-
-        info.index_to_loc_format = try!(info.read_u16(info.head+50)) as usize;
 
         Ok(info)
     }
@@ -988,9 +984,9 @@ pub unsafe fn get_glyph_offset(
    let g2: isize;
 
    if glyph_index >= (*info).num_glyphs as isize { return -1; } // glyph index out of range
-   if (*info).index_to_loc_format >= 2   { return -1; } // unknown index->glyph map format
+   if (*info).head.index_to_loc_format() >= 2   { return -1; } // unknown index->glyph map format
 
-   if (*info).index_to_loc_format == 0 {
+   if (*info).head.index_to_loc_format() == 0 {
       g1 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2)) as isize * 2;
       g2 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2 + 2)) as isize * 2;
    } else {
@@ -1458,8 +1454,7 @@ pub unsafe fn scale_for_mapping_em_to_pixels(
     info: *const FontInfo,
     pixels: f32
 ) -> f32 {
-   let units_per_em = ttUSHORT!((*info).data.as_ptr().offset((*info).head as isize + 18));
-   return pixels / units_per_em as f32;
+   pixels / (*info).head.units_per_em()
 }
 
 // frees the data allocated above

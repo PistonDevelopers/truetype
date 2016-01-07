@@ -65,6 +65,7 @@ impl HEAD {
         head.mac_style = try!(cursor.read_u16::<BigEndian>());
         head.lowest_rec_ppem = try!(cursor.read_u16::<BigEndian>());
         head.font_direction_hint = try!(cursor.read_i16::<BigEndian>());
+        // TODO: Add error handling. index_to_loc_format can be 0 or 1.
         head.index_to_loc_format = try!(cursor.read_i16::<BigEndian>());
         head.glyph_data_format = try!(cursor.read_i16::<BigEndian>());
 
@@ -96,6 +97,13 @@ impl HEAD {
         data
     }
 
+    /// Returns the number of units per em for the font.
+    ///
+    /// This value should be a power of 2. Its range is from 64 through 16384.
+    pub fn units_per_em(&self) -> f32 {
+        self.units_per_em as f32
+    }
+
     /// Returns the bounding box around all possible characters.
     #[allow(dead_code)]
     pub fn bounding_box(&self) -> BBox {
@@ -105,6 +113,11 @@ impl HEAD {
             x1: self.x_max as i32,
             y1: self.y_max as i32
         }
+    }
+
+    // TODO: Should return enum that denotes short or long offsets.
+    pub fn index_to_loc_format(&self) -> i16 {
+        self.index_to_loc_format
     }
 }
 

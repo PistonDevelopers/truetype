@@ -540,6 +540,13 @@ impl<'a> FontInfo<'a> {
     pub fn scale_for_pixel_height(&self, height: f32) -> f32 {
         height / (self.hhea.ascent() - self.hhea.descent()) as f32
     }
+
+    /// computes a scale factor to produce a font whose EM size is mapped to
+    /// 'pixels' tall. This is probably what traditional APIs compute, but
+    /// I'm not positive.
+    pub fn scale_for_mapping_em_to_pixels(&self, pixels: f32) -> f32 {
+       pixels / self.head.units_per_em()
+    }
 }
 
 fn prefix_is_tag(bs: &[u8], tag: &[u8; 4]) -> bool {
@@ -1447,15 +1454,6 @@ pub unsafe fn get_codepoint_hmetrics(
    get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
 }
 
-// computes a scale factor to produce a font whose EM size is mapped to
-// 'pixels' tall. This is probably what traditional APIs compute, but
-// I'm not positive.
-pub unsafe fn scale_for_mapping_em_to_pixels(
-    info: *const FontInfo,
-    pixels: f32
-) -> f32 {
-   pixels / (*info).head.units_per_em()
-}
 
 // frees the data allocated above
 
@@ -3219,7 +3217,7 @@ pub unsafe fn pack_font_ranges_gather_rects(
         let scale = if fh > 0.0 {
             (*info).scale_for_pixel_height(fh)
         } else {
-            scale_for_mapping_em_to_pixels(info, -fh)
+            (*info).scale_for_mapping_em_to_pixels(-fh)
         };
       (*ranges.offset(i)).h_oversample = (*spc).h_oversample as u8;
       (*ranges.offset(i)).v_oversample = (*spc).v_oversample as u8;
@@ -3269,7 +3267,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
         let scale = if fh > 0.0 {
             (*info).scale_for_pixel_height(fh)
         } else {
-            scale_for_mapping_em_to_pixels(info, -fh)
+            (*info).scale_for_mapping_em_to_pixels(-fh)
         };
       let recip_h: f32;
       let recip_v: f32;

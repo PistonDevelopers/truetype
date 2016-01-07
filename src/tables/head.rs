@@ -5,6 +5,9 @@ use Result;
 use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
 
+/// A font header.
+///
+/// The 'head' table contains global information about the font.
 #[derive(Debug, Default)]
 pub struct HEAD {
     version: Fixed,
@@ -27,6 +30,13 @@ pub struct HEAD {
 }
 
 impl HEAD {
+    /// Returns `head` font table.
+    ///
+    /// Attempts to read `data` starting from `offset` position.
+    ///
+    /// # Errors
+    /// Returns error if there is not enough data to read or version of
+    /// the `head` font table is not supported.
     pub fn from_data(data: &[u8], offset: usize) -> Result<HEAD> {
         if offset >= data.len() {
             return Err(Error::Malformed);

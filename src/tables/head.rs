@@ -132,7 +132,7 @@ mod tests {
     fn runner() {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
         test_read_write(&data);
-        test_version_mismatch(&data);
+        test_version_mismatch();
         test_read_malformed(&data);
     }
 
@@ -141,9 +141,8 @@ mod tests {
         assert_eq!(head.bytes(), &data[OFFSET..OFFSET + SIZE]);
     }
 
-    fn test_version_mismatch(data: &[u8]) {
-        let mut head = HEAD::from_data(data, OFFSET).unwrap();
-        head.version = ::types::Fixed(0);
+    fn test_version_mismatch() {
+        let head = HEAD::default();
         match HEAD::from_data(&head.bytes(), 0) {
             Err(::Error::HEADVersionIsNotSupported) => (),
             _ => panic!("should return error on version mismatch"),

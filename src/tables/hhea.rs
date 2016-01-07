@@ -131,7 +131,7 @@ mod tests {
     fn runner() {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
         test_read_write(&data);
-        test_version_mismatch(&data);
+        test_version_mismatch();
         test_read_not_enough_data(&data);
     }
 
@@ -141,10 +141,9 @@ mod tests {
         assert_eq!(hhea.bytes(), data);
     }
 
-    fn test_version_mismatch(data: &[u8]) {
-        let mut data = data.to_owned();
-        data[1] = 2;
-        match HHEA::from_data(&data) {
+    fn test_version_mismatch() {
+        let hhea = HHEA::default();
+        match HHEA::from_data(&hhea.bytes()) {
             Err(::Error::HHEAVersionIsNotSupported) => (),
             _ => panic!("should return error on version mismatch"),
         }

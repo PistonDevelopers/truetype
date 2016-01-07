@@ -1,5 +1,5 @@
 
-use super::Fixed;
+use types::Fixed;
 use Error;
 use Result;
 use std::io::Cursor;

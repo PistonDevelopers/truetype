@@ -5,10 +5,6 @@ mod head;
 pub use self::hhea::HHEA;
 pub use self::head::HEAD;
 
-#[derive(Debug, Default, PartialEq, Copy, Clone)]
-pub struct Fixed(pub i32);
-
-
 #[cfg(test)]
 fn read_file(path: &str) -> Vec<u8> {
     use std::fs::{self, File};

@@ -1,5 +1,5 @@
 
-use super::Fixed;
+use types::Fixed;
 use Error;
 use Result;
 use types::BBox;
@@ -143,7 +143,7 @@ mod tests {
 
     fn test_version_mismatch(data: &[u8]) {
         let mut head = HEAD::from_data(data, OFFSET).unwrap();
-        head.version = super::super::Fixed(0);
+        head.version = ::types::Fixed(0);
         match HEAD::from_data(&head.bytes(), 0) {
             Err(::Error::HEADVersionIsNotSupported) => (),
             _ => panic!("should return error on version mismatch"),

@@ -7,3 +7,6 @@ pub struct BBox {
     pub x1: i32,
     pub y1: i32,
 }
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub struct Fixed(pub i32);

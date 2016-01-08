@@ -20,14 +20,29 @@ pub fn find_table_offset(data: &[u8], fontstart: usize, tag: &[u8; 4]) -> Result
     return Ok(None);
 }
 
+/// Compatibility with unsafe code. TODO: Remove as soon as possible.
 pub unsafe fn find_table(data: *const u8, fontstart: u32, tag: &[u8; 4]) -> u32 {
-    let slice = ::std::slice::from_raw_parts(data, 1024); // Don't care about size.
+    let slice = ::std::slice::from_raw_parts(data, 1024); // DANGER: Don't care about size.
     find_table_offset(slice, fontstart as usize, tag).unwrap_or(None).unwrap_or(0) as u32
 }
 
 /// Checks that perfix of `bs` is equal to `tag`.
 pub fn prefix_is_tag(bs: &[u8], tag: &[u8; 4]) -> bool {
     bs.len()>=4 && bs[0]==tag[0] && bs[1]==tag[1] && bs[2]==tag[2] && bs[3]==tag[3]
+}
+
+#[cfg(test)]
+pub fn read_file(path: &str) -> Vec<u8> {
+    use std::fs::{self, File};
+    use std::io::{Read};
+    use std::path::PathBuf;
+
+    let path = PathBuf::from(path);
+    assert!(fs::metadata(&path).is_ok());
+    let mut file = File::open(&path).unwrap();
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).unwrap();
+    buffer
 }
 
 #[cfg(test)]

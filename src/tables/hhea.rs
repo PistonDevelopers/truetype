@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn smoke() {
-        let data = super::super::read_file("tests/Tuffy_Bold.ttf");
+        let data = ::utils::read_file("tests/Tuffy_Bold.ttf");
 
         let hhea = HHEA::from_data(&data, OFFSET).unwrap();
         assert_eq!(hhea.bytes(), &data[OFFSET..OFFSET + SIZE]);

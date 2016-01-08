@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn smoke() {
-        let data = super::super::read_file("tests/Tuffy_Bold.ttf");
+        let data = ::utils::read_file("tests/Tuffy_Bold.ttf");
 
         let head = HEAD::from_data(&data, OFFSET).unwrap();
         assert_eq!(head.bytes(), &data[OFFSET..OFFSET + SIZE]);

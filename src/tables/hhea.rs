@@ -1,5 +1,5 @@
 
-use super::Fixed;
+use types::Fixed;
 use Error;
 use Result;
 use std::io::Cursor;
@@ -38,14 +38,17 @@ pub struct HHEA {
 impl HHEA {
     /// Returns `hhea` font table.
     ///
-    /// Attempts to read `data` starting from zero position, so you should
-    /// provide a correct offset.
+    /// Attempts to read `data` starting from `offset` position.
     ///
     /// # Errors
     /// Returns error if there is not enough data to read or version of
     /// the `hhea` font table is not supported.
-    pub fn from_data(data: &[u8]) -> Result<HHEA> {
-        let mut cursor = Cursor::new(data);
+    pub fn from_data(data: &[u8], offset: usize) -> Result<HHEA> {
+        if offset >= data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let mut cursor = Cursor::new(&data[offset..]);
         let version = Fixed(try!(cursor.read_i32::<BigEndian>()));
         if version != Fixed(0x00010000) {
             return Err(Error::HHEAVersionIsNotSupported);
@@ -123,38 +126,23 @@ impl HHEA {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Error::*;
+    use expectest::prelude::*;
 
     const OFFSET: usize = 340;
     const SIZE: usize = 16 * 2 + 4;
 
     #[test]
-    fn runner() {
+    fn smoke() {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
-        test_read_write(&data);
-        test_version_mismatch(&data);
-        test_read_not_enough_data(&data);
-    }
 
-    fn test_read_write(data: &[u8]) {
-        let data = &data[OFFSET..OFFSET + SIZE];
-        let hhea = HHEA::from_data(data).unwrap();
-        assert_eq!(hhea.bytes(), data);
-    }
+        let hhea = HHEA::from_data(&data, OFFSET).unwrap();
+        assert_eq!(hhea.bytes(), &data[OFFSET..OFFSET + SIZE]);
 
-    fn test_version_mismatch(data: &[u8]) {
-        let mut data = data.to_owned();
-        data[1] = 2;
-        match HHEA::from_data(&data) {
-            Err(::Error::HHEAVersionIsNotSupported) => (),
-            _ => panic!("should return error on version mismatch"),
-        }
-    }
+        let hhea = HHEA::default();
+        expect!(HHEA::from_data(&hhea.bytes(), 0)).to(be_err().value(HHEAVersionIsNotSupported));
 
-    fn test_read_not_enough_data(data: &[u8]) {
-        match HHEA::from_data(&data[..SIZE - 1]) {
-            Err(_) => (),
-            _ => panic!("should return error if not enough data"),
-        }
+        expect!(HHEA::from_data(&data, data.len())).to(be_err().value(Malformed));
     }
 }
 

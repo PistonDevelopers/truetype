@@ -244,16 +244,21 @@
 extern crate byteorder;
 extern crate libc;
 
+#[cfg(test)]
+#[macro_use(expect)]
+extern crate expectest;
+
 use std::ptr::{ null, null_mut };
 use std::mem::size_of;
 use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::HHEA;
+use tables::{HHEA, HEAD};
 
 mod error;
 mod tables;
+mod types;
 
 pub use error::Error;
 
@@ -414,17 +419,15 @@ pub struct FontInfo<'a> {
    num_glyphs: usize,
 
    hhea: HHEA,
+   head: HEAD,
 
    // table locations as offset from start of .ttf
    loca: usize,
-   head: usize,
    glyf: usize,
    hmtx: usize,
    kern: usize,
    // a cmap mapping for our chosen character encoding
    index_map: usize,
-   // format needed to map from glyph index to glyph
-   index_to_loc_format: usize,
 }
 
 impl<'a> FontInfo<'a> {
@@ -436,23 +439,23 @@ impl<'a> FontInfo<'a> {
             fontstart: 0,
             num_glyphs: 0,
             hhea: HHEA::default(),
+            head: HEAD::default(),
             loca: 0,
-            head: 0,
             glyf: 0,
             hmtx: 0,
             kern: 0,
             index_map: 0,
-            index_to_loc_format: 0,
         };
 
         info.fontstart = fontstart;
 
         let hhea_offset = try!(info.find_required_table(b"hhea"));
-        info.hhea = try!(HHEA::from_data(&data[hhea_offset..]));
+        info.hhea = try!(HHEA::from_data(&data, hhea_offset));
+        let head_offset = try!(info.find_required_table(b"head"));
+        info.head = try!(HEAD::from_data(&data, head_offset));
 
         let cmap = try!(info.find_required_table(b"cmap"));
         info.loca = try!(info.find_required_table(b"loca"));
-        info.head = try!(info.find_required_table(b"head"));
         info.glyf = try!(info.find_required_table(b"glyf"));
         info.hmtx = try!(info.find_required_table(b"hmtx"));
         info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
@@ -500,8 +503,6 @@ impl<'a> FontInfo<'a> {
             return Err(Error::MissingTable);
         }
 
-        info.index_to_loc_format = try!(info.read_u16(info.head+50)) as usize;
-
         Ok(info)
     }
 
@@ -542,6 +543,13 @@ impl<'a> FontInfo<'a> {
     // so if you prefer to measure height by the ascent only, use a similar calculation.
     pub fn scale_for_pixel_height(&self, height: f32) -> f32 {
         height / (self.hhea.ascent() - self.hhea.descent()) as f32
+    }
+
+    /// computes a scale factor to produce a font whose EM size is mapped to
+    /// 'pixels' tall. This is probably what traditional APIs compute, but
+    /// I'm not positive.
+    pub fn scale_for_mapping_em_to_pixels(&self, pixels: f32) -> f32 {
+       pixels / self.head.units_per_em()
     }
 }
 
@@ -987,9 +995,9 @@ pub unsafe fn get_glyph_offset(
    let g2: isize;
 
    if glyph_index >= (*info).num_glyphs as isize { return -1; } // glyph index out of range
-   if (*info).index_to_loc_format >= 2   { return -1; } // unknown index->glyph map format
+   if (*info).head.index_to_loc_format() >= 2   { return -1; } // unknown index->glyph map format
 
-   if (*info).index_to_loc_format == 0 {
+   if (*info).head.index_to_loc_format() == 0 {
       g1 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2)) as isize * 2;
       g2 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2 + 2)) as isize * 2;
    } else {
@@ -1450,30 +1458,6 @@ pub unsafe fn get_codepoint_hmetrics(
    get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
 }
 
-// the bounding box around all possible characters
-pub unsafe fn get_font_bounding_box(
-    info: *const FontInfo,
-    x0: *mut isize,
-    y0: *mut isize,
-    x1: *mut isize,
-    y1: *mut isize
-) {
-   *x0 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 36)) as isize;
-   *y0 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 38)) as isize;
-   *x1 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 40)) as isize;
-   *y1 = ttSHORT!((*info).data.as_ptr().offset((*info).head as isize + 42)) as isize;
-}
-
-// computes a scale factor to produce a font whose EM size is mapped to
-// 'pixels' tall. This is probably what traditional APIs compute, but
-// I'm not positive.
-pub unsafe fn scale_for_mapping_em_to_pixels(
-    info: *const FontInfo,
-    pixels: f32
-) -> f32 {
-   let units_per_em = ttUSHORT!((*info).data.as_ptr().offset((*info).head as isize + 18));
-   return pixels / units_per_em as f32;
-}
 
 // frees the data allocated above
 
@@ -3237,7 +3221,7 @@ pub unsafe fn pack_font_ranges_gather_rects(
         let scale = if fh > 0.0 {
             (*info).scale_for_pixel_height(fh)
         } else {
-            scale_for_mapping_em_to_pixels(info, -fh)
+            (*info).scale_for_mapping_em_to_pixels(-fh)
         };
       (*ranges.offset(i)).h_oversample = (*spc).h_oversample as u8;
       (*ranges.offset(i)).v_oversample = (*spc).v_oversample as u8;
@@ -3287,7 +3271,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
         let scale = if fh > 0.0 {
             (*info).scale_for_pixel_height(fh)
         } else {
-            scale_for_mapping_em_to_pixels(info, -fh)
+            (*info).scale_for_mapping_em_to_pixels(-fh)
         };
       let recip_h: f32;
       let recip_v: f32;

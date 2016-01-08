@@ -3,12 +3,12 @@ use std::fmt;
 use byteorder;
 
 /// An Error type.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Error {
     Malformed,
     MissingTable,
     HHEAVersionIsNotSupported,
-    Byteorder(byteorder::Error),
+    HEADVersionIsNotSupported,
 }
 
 impl fmt::Display for Error {
@@ -24,13 +24,13 @@ impl ::std::error::Error for Error {
             Error::Malformed => "malformed data",
             Error::MissingTable => "missing table",
             Error::HHEAVersionIsNotSupported => "hhea version is not supported",
-            Error::Byteorder(_) => "byteorder error",
+            Error::HEADVersionIsNotSupported => "head version is not supported",
         }
     }
 }
 
 impl From<byteorder::Error> for Error {
-    fn from(e: byteorder::Error) -> Self {
-        Error::Byteorder(e)
+    fn from(_: byteorder::Error) -> Self {
+        Error::Malformed
     }
 }

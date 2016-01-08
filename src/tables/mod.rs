@@ -1,11 +1,9 @@
 
 mod hhea;
+mod head;
 
 pub use self::hhea::HHEA;
-
-#[derive(Debug, Default, PartialEq, Copy, Clone)]
-pub struct Fixed(pub i32);
-
+pub use self::head::HEAD;
 
 #[cfg(test)]
 fn read_file(path: &str) -> Vec<u8> {

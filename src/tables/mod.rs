@@ -1,9 +1,11 @@
 
 mod hhea;
 mod head;
+mod hmtx;
 
 pub use self::hhea::HHEA;
 pub use self::head::HEAD;
+pub use self::hmtx::{HMTX, LongHorizontalMetric};
 
 #[cfg(test)]
 fn read_file(path: &str) -> Vec<u8> {

@@ -446,7 +446,7 @@ impl<'a> FontInfo<'a> {
         info.fontstart = fontstart;
 
         let hhea_offset = try!(info.find_required_table(b"hhea"));
-        info.hhea = try!(HHEA::from_data(&data[hhea_offset..]));
+        info.hhea = try!(HHEA::from_data(&data, hhea_offset));
         let head_offset = try!(info.find_required_table(b"head"));
         info.head = try!(HEAD::from_data(&data, head_offset));
 

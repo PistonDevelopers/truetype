@@ -38,14 +38,17 @@ pub struct HHEA {
 impl HHEA {
     /// Returns `hhea` font table.
     ///
-    /// Attempts to read `data` starting from zero position, so you should
-    /// provide a correct offset.
+    /// Attempts to read `data` starting from `offset` position.
     ///
     /// # Errors
     /// Returns error if there is not enough data to read or version of
     /// the `hhea` font table is not supported.
-    pub fn from_data(data: &[u8]) -> Result<HHEA> {
-        let mut cursor = Cursor::new(data);
+    pub fn from_data(data: &[u8], offset: usize) -> Result<HHEA> {
+        if offset >= data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let mut cursor = Cursor::new(&data[offset..]);
         let version = Fixed(try!(cursor.read_i32::<BigEndian>()));
         if version != Fixed(0x00010000) {
             return Err(Error::HHEAVersionIsNotSupported);
@@ -132,27 +135,26 @@ mod tests {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
         test_read_write(&data);
         test_version_mismatch();
-        test_read_not_enough_data(&data);
+        test_read_malformed(&data);
     }
 
     fn test_read_write(data: &[u8]) {
-        let data = &data[OFFSET..OFFSET + SIZE];
-        let hhea = HHEA::from_data(data).unwrap();
-        assert_eq!(hhea.bytes(), data);
+        let hhea = HHEA::from_data(data, OFFSET).unwrap();
+        assert_eq!(hhea.bytes(), &data[OFFSET..OFFSET + SIZE]);
     }
 
     fn test_version_mismatch() {
         let hhea = HHEA::default();
-        match HHEA::from_data(&hhea.bytes()) {
+        match HHEA::from_data(&hhea.bytes(), 0) {
             Err(::Error::HHEAVersionIsNotSupported) => (),
             _ => panic!("should return error on version mismatch"),
         }
     }
 
-    fn test_read_not_enough_data(data: &[u8]) {
-        match HHEA::from_data(&data[..SIZE - 1]) {
-            Err(_) => (),
-            _ => panic!("should return error if not enough data"),
+    fn test_read_malformed(data: &[u8]) {
+        match HHEA::from_data(data, data.len()) {
+            Err(::Error::Malformed) => (),
+            _ => panic!("should return error on malformed data"),
         }
     }
 }

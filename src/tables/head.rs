@@ -124,35 +124,22 @@ impl HEAD {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Error::*;
+    use expectest::prelude::*;
 
     const OFFSET: usize = 284;
     const SIZE: usize = 4 * 4 + 2 * 2 + 8 * 2 + 2 * 9;
 
     #[test]
-    fn runner() {
+    fn smoke() {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
-        test_read_write(&data);
-        test_version_mismatch();
-        test_read_malformed(&data);
-    }
 
-    fn test_read_write(data: &[u8]) {
-        let head = HEAD::from_data(data, OFFSET).unwrap();
+        let head = HEAD::from_data(&data, OFFSET).unwrap();
         assert_eq!(head.bytes(), &data[OFFSET..OFFSET + SIZE]);
-    }
 
-    fn test_version_mismatch() {
         let head = HEAD::default();
-        match HEAD::from_data(&head.bytes(), 0) {
-            Err(::Error::HEADVersionIsNotSupported) => (),
-            _ => panic!("should return error on version mismatch"),
-        }
-    }
+        expect!(HEAD::from_data(&head.bytes(), 0)).to(be_err().value(HEADVersionIsNotSupported));
 
-    fn test_read_malformed(data: &[u8]) {
-        match HEAD::from_data(data, data.len()) {
-            Err(::Error::Malformed) => (),
-            _ => panic!("should return error on malformed data"),
-        }
+        expect!(HEAD::from_data(&data, data.len())).to(be_err().value(Malformed));
     }
 }

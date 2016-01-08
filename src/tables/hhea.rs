@@ -126,36 +126,23 @@ impl HHEA {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Error::*;
+    use expectest::prelude::*;
 
     const OFFSET: usize = 340;
     const SIZE: usize = 16 * 2 + 4;
 
     #[test]
-    fn runner() {
+    fn smoke() {
         let data = super::super::read_file("tests/Tuffy_Bold.ttf");
-        test_read_write(&data);
-        test_version_mismatch();
-        test_read_malformed(&data);
-    }
 
-    fn test_read_write(data: &[u8]) {
-        let hhea = HHEA::from_data(data, OFFSET).unwrap();
+        let hhea = HHEA::from_data(&data, OFFSET).unwrap();
         assert_eq!(hhea.bytes(), &data[OFFSET..OFFSET + SIZE]);
-    }
 
-    fn test_version_mismatch() {
         let hhea = HHEA::default();
-        match HHEA::from_data(&hhea.bytes(), 0) {
-            Err(::Error::HHEAVersionIsNotSupported) => (),
-            _ => panic!("should return error on version mismatch"),
-        }
-    }
+        expect!(HHEA::from_data(&hhea.bytes(), 0)).to(be_err().value(HHEAVersionIsNotSupported));
 
-    fn test_read_malformed(data: &[u8]) {
-        match HHEA::from_data(data, data.len()) {
-            Err(::Error::Malformed) => (),
-            _ => panic!("should return error on malformed data"),
-        }
+        expect!(HHEA::from_data(&data, data.len())).to(be_err().value(Malformed));
     }
 }
 

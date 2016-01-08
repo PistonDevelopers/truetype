@@ -244,6 +244,10 @@
 extern crate byteorder;
 extern crate libc;
 
+#[cfg(test)]
+#[macro_use(expect)]
+extern crate expectest;
+
 use std::ptr::{ null, null_mut };
 use std::mem::size_of;
 use std::ffi::CString;

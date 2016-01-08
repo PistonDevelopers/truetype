@@ -259,6 +259,7 @@ use tables::{HHEA, HEAD};
 mod error;
 mod tables;
 mod types;
+mod utils;
 
 pub use error::Error;
 
@@ -521,18 +522,7 @@ impl<'a> FontInfo<'a> {
     }
 
     fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>> {
-        let num_tables = try!(self.read_u16(self.fontstart + 4)) as usize;
-        let tabledir: usize = self.fontstart + 12;
-
-        if tabledir > self.data.len() {
-            return Err(Error::Malformed);
-        }
-        for table_chunk in self.data[tabledir..].chunks(16).take(num_tables) {
-            if table_chunk.len()==16 && prefix_is_tag(table_chunk, tag) {
-                return Ok(Some(BigEndian::read_u32(&table_chunk[8..12]) as usize));
-            }
-        }
-        return Ok(None);
+        utils::find_table_offset(self.data, self.fontstart, tag)
     }
 
     // computes a scale factor to produce a font whose "height" is 'pixels' tall.
@@ -551,10 +541,6 @@ impl<'a> FontInfo<'a> {
     pub fn scale_for_mapping_em_to_pixels(&self, pixels: f32) -> f32 {
        pixels / self.head.units_per_em()
     }
-}
-
-fn prefix_is_tag(bs: &[u8], tag: &[u8; 4]) -> bool {
-    bs.len()>=4 && bs[0]==tag[0] && bs[1]==tag[1] && bs[2]==tag[2] && bs[3]==tag[3]
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -793,23 +779,6 @@ pub unsafe fn isfont(font: *const u8) -> isize {
    if stbtt_tag!(font, "typ1".as_ptr())  { return 1; } // TrueType with type 1 font -- we don't support this!
    if stbtt_tag!(font, "OTTO".as_ptr())  { return 1; } // OpenType with CFF
    if stbtt_tag4!(font, 0,1,0,0) { return 1; } // OpenType 1.0
-   return 0;
-}
-
-// @OPTIMIZE: binary search
-pub unsafe fn find_table(
-    data: *const u8,
-    fontstart: u32,
-    tag: *const c_char
-) -> u32 {
-   let num_tables: i32 = ttUSHORT!(data.offset(fontstart as isize +4)) as i32;
-   let tabledir: u32 = fontstart + 12;
-   for i in 0..num_tables {
-      let loc: u32 = tabledir + 16*i as u32;
-      if stbtt_tag!(data.offset(loc as isize +0), tag as *const u8) {
-         return ttULONG!(data.offset(loc as isize +8));
-      }
-   }
    return 0;
 }
 
@@ -3580,7 +3549,7 @@ pub unsafe fn get_font_name_string(
    let string_offset: i32;
    let fc: *const u8 = (*font).data.as_ptr();
    let offset: u32 = (*font).fontstart as u32;
-   let nm: u32 = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   let nm: u32 = utils::find_table(fc, offset, b"name");
    if nm == 0 { return null(); }
 
    count = ttUSHORT!(fc.offset(nm as isize +2)) as i32;
@@ -3672,11 +3641,11 @@ pub unsafe fn matches(
 
    // check italics/bold/underline flags in macStyle...
    if flags != 0 {
-      hd = find_table(fc, offset, CString::new("head").unwrap().as_ptr());
+      hd = utils::find_table(fc, offset, b"head");
       if (ttUSHORT!(fc.offset(hd as isize + 44)) & 7) != (flags as u16 & 7) { return 0; }
    }
 
-   nm = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   nm = utils::find_table(fc, offset, b"name");
    if nm == 0 { return 0; }
 
    if flags != 0 {

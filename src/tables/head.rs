@@ -127,15 +127,15 @@ mod tests {
     use Error::*;
     use expectest::prelude::*;
 
-    const OFFSET: usize = 284;
     const SIZE: usize = 4 * 4 + 2 * 2 + 8 * 2 + 2 * 9;
 
     #[test]
     fn smoke() {
         let data = ::utils::read_file("tests/Tuffy_Bold.ttf");
+        let offset = ::utils::find_table_offset(&data, 0, b"head").unwrap().unwrap();
 
-        let head = HEAD::from_data(&data, OFFSET).unwrap();
-        assert_eq!(head.bytes(), &data[OFFSET..OFFSET + SIZE]);
+        let head = HEAD::from_data(&data, offset).unwrap();
+        assert_eq!(head.bytes(), &data[offset..offset + SIZE]);
 
         let head = HEAD::default();
         expect!(HEAD::from_data(&head.bytes(), 0)).to(be_err().value(HEADVersionIsNotSupported));

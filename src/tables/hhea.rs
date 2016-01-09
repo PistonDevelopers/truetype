@@ -71,6 +71,8 @@ impl HHEA {
         hhea.reserved3 = try!(cursor.read_i16::<BigEndian>());
         hhea.reserved4 = try!(cursor.read_i16::<BigEndian>());
         hhea.metric_data_format = try!(cursor.read_i16::<BigEndian>());
+        // TODO: Add error handling. Seems like `num_of_long_hor_metrics`
+        // should be >= 1. This is requirement for `hmtx` font table.
         hhea.num_of_long_hor_metrics = try!(cursor.read_u16::<BigEndian>());
 
         Ok(hhea)
@@ -129,15 +131,15 @@ mod tests {
     use Error::*;
     use expectest::prelude::*;
 
-    const OFFSET: usize = 340;
     const SIZE: usize = 16 * 2 + 4;
 
     #[test]
     fn smoke() {
-        let data = super::super::read_file("tests/Tuffy_Bold.ttf");
+        let data = ::utils::read_file("tests/Tuffy_Bold.ttf");
+        let offset = ::utils::find_table_offset(&data, 0, b"hhea").unwrap().unwrap();
 
-        let hhea = HHEA::from_data(&data, OFFSET).unwrap();
-        assert_eq!(hhea.bytes(), &data[OFFSET..OFFSET + SIZE]);
+        let hhea = HHEA::from_data(&data, offset).unwrap();
+        assert_eq!(hhea.bytes(), &data[offset..offset + SIZE]);
 
         let hhea = HHEA::default();
         expect!(HHEA::from_data(&hhea.bytes(), 0)).to(be_err().value(HHEAVersionIsNotSupported));

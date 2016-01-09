@@ -250,15 +250,15 @@ extern crate expectest;
 
 use std::ptr::{ null, null_mut };
 use std::mem::size_of;
-use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::{HHEA, HEAD};
+use tables::{HHEA, HEAD, MAXP, HMTX};
 
 mod error;
 mod tables;
 mod types;
+mod utils;
 
 pub use error::Error;
 
@@ -415,16 +415,15 @@ pub struct FontInfo<'a> {
    data: &'a [u8],
    // offset of start of font
    fontstart: usize,
-   // number of glyphs, needed for range checking
-   num_glyphs: usize,
 
    hhea: HHEA,
    head: HEAD,
+   maxp: MAXP,
+   hmtx: HMTX,
 
    // table locations as offset from start of .ttf
    loca: usize,
    glyf: usize,
-   hmtx: usize,
    kern: usize,
    // a cmap mapping for our chosen character encoding
    index_map: usize,
@@ -437,12 +436,12 @@ impl<'a> FontInfo<'a> {
         let mut info = FontInfo{
             data: data,
             fontstart: 0,
-            num_glyphs: 0,
             hhea: HHEA::default(),
             head: HEAD::default(),
+            maxp: MAXP::default(),
+            hmtx: HMTX::default(),
             loca: 0,
             glyf: 0,
-            hmtx: 0,
             kern: 0,
             index_map: 0,
         };
@@ -453,17 +452,17 @@ impl<'a> FontInfo<'a> {
         info.hhea = try!(HHEA::from_data(&data, hhea_offset));
         let head_offset = try!(info.find_required_table(b"head"));
         info.head = try!(HEAD::from_data(&data, head_offset));
+        let maxp_offset = try!(info.find_required_table(b"maxp"));
+        info.maxp = try!(MAXP::from_data(&data, maxp_offset));
+        let hmtx_offset = try!(info.find_required_table(b"hmtx"));
+        let metrics = info.hhea.num_of_long_hor_metrics();
+        let glyphs = info.maxp.num_glyphs();
+        info.hmtx = try!(HMTX::from_data(&data, hmtx_offset, metrics, glyphs));
 
         let cmap = try!(info.find_required_table(b"cmap"));
         info.loca = try!(info.find_required_table(b"loca"));
         info.glyf = try!(info.find_required_table(b"glyf"));
-        info.hmtx = try!(info.find_required_table(b"hmtx"));
         info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
-
-        info.num_glyphs = match try!(info.find_table(b"maxp")) {
-            Some(maxp) => try!(info.read_u16(maxp + 4)) as usize,
-            None => 0xffff
-        };
 
         // find a cmap encoding table we understand *now* to avoid searching
         // later. (todo: could make this installable)
@@ -521,18 +520,7 @@ impl<'a> FontInfo<'a> {
     }
 
     fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>> {
-        let num_tables = try!(self.read_u16(self.fontstart + 4)) as usize;
-        let tabledir: usize = self.fontstart + 12;
-
-        if tabledir > self.data.len() {
-            return Err(Error::Malformed);
-        }
-        for table_chunk in self.data[tabledir..].chunks(16).take(num_tables) {
-            if table_chunk.len()==16 && prefix_is_tag(table_chunk, tag) {
-                return Ok(Some(BigEndian::read_u32(&table_chunk[8..12]) as usize));
-            }
-        }
-        return Ok(None);
+        utils::find_table_offset(self.data, self.fontstart, tag)
     }
 
     // computes a scale factor to produce a font whose "height" is 'pixels' tall.
@@ -551,10 +539,6 @@ impl<'a> FontInfo<'a> {
     pub fn scale_for_mapping_em_to_pixels(&self, pixels: f32) -> f32 {
        pixels / self.head.units_per_em()
     }
-}
-
-fn prefix_is_tag(bs: &[u8], tag: &[u8; 4]) -> bool {
-    bs.len()>=4 && bs[0]==tag[0] && bs[1]==tag[1] && bs[2]==tag[2] && bs[3]==tag[3]
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -796,23 +780,6 @@ pub unsafe fn isfont(font: *const u8) -> isize {
    return 0;
 }
 
-// @OPTIMIZE: binary search
-pub unsafe fn find_table(
-    data: *const u8,
-    fontstart: u32,
-    tag: *const c_char
-) -> u32 {
-   let num_tables: i32 = ttUSHORT!(data.offset(fontstart as isize +4)) as i32;
-   let tabledir: u32 = fontstart + 12;
-   for i in 0..num_tables {
-      let loc: u32 = tabledir + 16*i as u32;
-      if stbtt_tag!(data.offset(loc as isize +0), tag as *const u8) {
-         return ttULONG!(data.offset(loc as isize +8));
-      }
-   }
-   return 0;
-}
-
 // Each .ttf/.ttc file may have more than one font. Each font has a sequential
 // index number starting from 0. Call this function to get the font offset for
 // a given index; it returns -1 if the index is out of range. A regular .ttf
@@ -994,7 +961,7 @@ pub unsafe fn get_glyph_offset(
    let g1: isize;
    let g2: isize;
 
-   if glyph_index >= (*info).num_glyphs as isize { return -1; } // glyph index out of range
+   if glyph_index >= (*info).maxp.num_glyphs() as isize { return -1; } // glyph index out of range
    if (*info).head.index_to_loc_format() >= 2   { return -1; } // unknown index->glyph map format
 
    if (*info).head.index_to_loc_format() == 0 {
@@ -1368,31 +1335,6 @@ pub unsafe fn get_glyph_shape(
    return num_vertices;
 }
 
-pub unsafe fn get_glyph_hmetrics(
-    info: *const FontInfo,
-    glyph_index: isize,
-    advance_width: *mut isize,
-    left_side_bearing: *mut isize
-) {
-   let num_of_long_hor_metrics = (*info).hhea.num_of_long_hor_metrics();
-   if glyph_index < num_of_long_hor_metrics as isize {
-      if advance_width != null_mut() {
-          *advance_width    = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*glyph_index)) as isize;
-      }
-      if left_side_bearing != null_mut() {
-          *left_side_bearing = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*glyph_index + 2)) as isize;
-      }
-   } else {
-      if advance_width != null_mut() {
-          *advance_width    = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*(num_of_long_hor_metrics as isize -1))) as isize;
-      }
-      if left_side_bearing != null_mut() {
-          *left_side_bearing = ttSHORT!((*info).data.as_ptr().offset(
-              (*info).hmtx as isize + 4*num_of_long_hor_metrics as isize + 2*(glyph_index - num_of_long_hor_metrics as isize))) as isize;
-      }
-   }
-}
-
 pub unsafe fn get_glyph_kern_advance(
     info: *mut FontInfo,
     glyph1: isize,
@@ -1455,7 +1397,11 @@ pub unsafe fn get_codepoint_hmetrics(
     advance_width: *mut isize,
     left_side_bearing: *mut isize
 ) {
-   get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
+    let i = find_glyph_index(info,codepoint);
+    assert!(i >= 0);
+    let metric = (*info).hmtx.hmetric_for_glyph_at_index(i as usize);
+    *advance_width = metric.advance_width as isize;
+    *left_side_bearing = metric.left_side_bearing as isize;
 }
 
 
@@ -2775,8 +2721,6 @@ pub unsafe fn bake_font_bitmap(
     scale = f.scale_for_pixel_height(pixel_height);
 
    for i in 0..num_chars {
-      let mut advance: isize = 0;
-      let mut lsb: isize = 0;
       let mut x0: isize = 0;
       let mut y0: isize = 0;
       let mut x1: isize = 0;
@@ -2784,7 +2728,10 @@ pub unsafe fn bake_font_bitmap(
       let gw: isize;
       let gh: isize;
       let g: isize = find_glyph_index(&f, first_char + i);
-      get_glyph_hmetrics(&f, g, &mut advance, &mut lsb);
+
+      assert!(g >= 0);
+      let metric = f.hmtx.hmetric_for_glyph_at_index(g as usize);
+
       get_glyph_bitmap_box(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
       gw = x1-x0;
       gh = y1-y0;
@@ -2802,7 +2749,7 @@ pub unsafe fn bake_font_bitmap(
       (*chardata.offset(i)).y0 = y as u16;
       (*chardata.offset(i)).x1 = (x + gw) as u16;
       (*chardata.offset(i)).y1 = (y + gh) as u16;
-      (*chardata.offset(i)).xadvance = scale * advance as f32;
+      (*chardata.offset(i)).xadvance = scale * metric.advance_width as f32;
       (*chardata.offset(i)).xoff     = x0 as f32;
       (*chardata.offset(i)).yoff     = y0 as f32;
       x = x + gw + 1;
@@ -3287,8 +3234,6 @@ pub unsafe fn pack_font_ranges_render_into_rects(
          let r: *mut Rect = rects.offset(k);
          if (*r).was_packed != 0 {
             let bc: *mut PackedChar = (*ranges.offset(i)).chardata_for_range.offset(j);
-            let mut advance: isize = 0;
-            let mut lsb: isize = 0;
             let mut x0: isize = 0;
             let mut y0: isize = 0;
             let mut x1: isize = 0;
@@ -3307,7 +3252,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
             (*r).y += pad;
             (*r).w -= pad;
             (*r).h -= pad;
-            get_glyph_hmetrics(info, glyph, &mut advance, &mut lsb);
+
             get_glyph_bitmap_box(info, glyph,
                                     scale * (*spc).h_oversample as f32,
                                     scale * (*spc).v_oversample as f32,
@@ -3334,11 +3279,14 @@ pub unsafe fn pack_font_ranges_render_into_rects(
                                   (*spc).v_oversample);
             }
 
+            assert!(glyph >= 0);
+            let metric = (*info).hmtx.hmetric_for_glyph_at_index(glyph as usize);
+
             (*bc).x0 = (*r).x as u16;
             (*bc).y0 = (*r).y as u16;
             (*bc).x1 = ((*r).x + (*r).w) as u16;
             (*bc).y1 = ((*r).y + (*r).h) as u16;
-            (*bc).xadvance = scale * advance as f32;
+            (*bc).xadvance = scale * metric.advance_width as f32;
             (*bc).xoff = x0 as f32 * recip_h + sub_x;
             (*bc).yoff = y0 as f32 * recip_v + sub_y;
             (*bc).xoff2 = (x0 + (*r).w) as f32 * recip_h + sub_x;
@@ -3580,7 +3528,7 @@ pub unsafe fn get_font_name_string(
    let string_offset: i32;
    let fc: *const u8 = (*font).data.as_ptr();
    let offset: u32 = (*font).fontstart as u32;
-   let nm: u32 = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   let nm: u32 = utils::find_table(fc, offset, b"name");
    if nm == 0 { return null(); }
 
    count = ttUSHORT!(fc.offset(nm as isize +2)) as i32;
@@ -3672,11 +3620,11 @@ pub unsafe fn matches(
 
    // check italics/bold/underline flags in macStyle...
    if flags != 0 {
-      hd = find_table(fc, offset, CString::new("head").unwrap().as_ptr());
+      hd = utils::find_table(fc, offset, b"head");
       if (ttUSHORT!(fc.offset(hd as isize + 44)) & 7) != (flags as u16 & 7) { return 0; }
    }
 
-   nm = find_table(fc, offset, CString::new("name").unwrap().as_ptr());
+   nm = utils::find_table(fc, offset, b"name");
    if nm == 0 { return 0; }
 
    if flags != 0 {

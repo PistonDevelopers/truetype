@@ -9,6 +9,7 @@ pub enum Error {
     MissingTable,
     HHEAVersionIsNotSupported,
     HEADVersionIsNotSupported,
+    MAXPVersionIsNotSupported,
 }
 
 impl fmt::Display for Error {
@@ -25,6 +26,7 @@ impl ::std::error::Error for Error {
             Error::MissingTable => "missing table",
             Error::HHEAVersionIsNotSupported => "hhea version is not supported",
             Error::HEADVersionIsNotSupported => "head version is not supported",
+            Error::MAXPVersionIsNotSupported => "maxp version is not supported",
         }
     }
 }

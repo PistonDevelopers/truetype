@@ -32,7 +32,7 @@ impl HMTX {
     /// # Errors
     /// Returns error if there is not enough data to read or the number of
     /// `metrics` is greater than the number of `glyphs`.
-    pub fn from_data(data: &[u8], offset: usize, metrics: usize, glyphs: usize) -> Result<HMTX> {
+    pub fn from_data(data: &[u8], offset: usize, metrics: u32, glyphs: u32) -> Result<HMTX> {
         if offset >= data.len() {
             return Err(Error::Malformed);
         }
@@ -42,8 +42,8 @@ impl HMTX {
         let bearings = glyphs - metrics;
 
         let mut hmtx = HMTX {
-            metrics: Vec::with_capacity(metrics),
-            left_side_bearings: Vec::with_capacity(bearings),
+            metrics: Vec::with_capacity(metrics as usize),
+            left_side_bearings: Vec::with_capacity(bearings as usize),
         };
 
         let mut cursor = Cursor::new(&data[offset..]);
@@ -80,10 +80,23 @@ impl HMTX {
 mod tests {
     use super::*;
     use Error::*;
+    use tables::{HHEA, MAXP};
     use expectest::prelude::*;
 
     #[test]
     fn smoke() {
+        let data = ::utils::read_file("tests/Tuffy_Bold.ttf");
+        let hhea_offset = ::utils::find_table_offset(&data, 0, b"hhea").unwrap().unwrap();
+        let metrics = HHEA::from_data(&data, hhea_offset).unwrap().num_of_long_hor_metrics();
+        let maxp_offset = ::utils::find_table_offset(&data, 0, b"maxp").unwrap().unwrap();
+        let glyphs = MAXP::from_data(&data, maxp_offset).unwrap().num_glyphs();
 
+        let size = (metrics * 4 + (glyphs - metrics) * 2) as usize;
+        let hmtx_offset = ::utils::find_table_offset(&data, 0, b"hmtx").unwrap().unwrap();
+        let hmtx = HMTX::from_data(&data, hmtx_offset, metrics, glyphs).unwrap();
+        assert_eq!(hmtx.bytes(), &data[hmtx_offset..hmtx_offset + size]);
+
+        expect!(HMTX::from_data(&data, data.len(), metrics, glyphs)).to(be_err().value(Malformed));
+        expect!(HMTX::from_data(&data, hmtx_offset, 1, 0)).to(be_err().value(Malformed));
     }
 }

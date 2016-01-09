@@ -71,6 +71,8 @@ impl HHEA {
         hhea.reserved3 = try!(cursor.read_i16::<BigEndian>());
         hhea.reserved4 = try!(cursor.read_i16::<BigEndian>());
         hhea.metric_data_format = try!(cursor.read_i16::<BigEndian>());
+        // TODO: Add error handling. Seems like `num_of_long_hor_metrics`
+        // should be >= 1. This is requirement for `hmtx` font table.
         hhea.num_of_long_hor_metrics = try!(cursor.read_u16::<BigEndian>());
 
         Ok(hhea)

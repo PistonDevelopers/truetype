@@ -254,7 +254,7 @@ use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::{HHEA, HEAD, MAXP};
+use tables::{HHEA, HEAD, MAXP, HMTX};
 
 mod error;
 mod tables;
@@ -420,11 +420,11 @@ pub struct FontInfo<'a> {
    hhea: HHEA,
    head: HEAD,
    maxp: MAXP,
+   hmtx: HMTX,
 
    // table locations as offset from start of .ttf
    loca: usize,
    glyf: usize,
-   hmtx: usize,
    kern: usize,
    // a cmap mapping for our chosen character encoding
    index_map: usize,
@@ -440,9 +440,9 @@ impl<'a> FontInfo<'a> {
             hhea: HHEA::default(),
             head: HEAD::default(),
             maxp: MAXP::default(),
+            hmtx: HMTX::default(),
             loca: 0,
             glyf: 0,
-            hmtx: 0,
             kern: 0,
             index_map: 0,
         };
@@ -455,11 +455,14 @@ impl<'a> FontInfo<'a> {
         info.head = try!(HEAD::from_data(&data, head_offset));
         let maxp_offset = try!(info.find_required_table(b"maxp"));
         info.maxp = try!(MAXP::from_data(&data, maxp_offset));
+        let hmtx_offset = try!(info.find_required_table(b"hmtx"));
+        let metrics = info.hhea.num_of_long_hor_metrics();
+        let glyphs = info.maxp.num_glyphs();
+        info.hmtx = try!(HMTX::from_data(&data, hmtx_offset, metrics, glyphs));
 
         let cmap = try!(info.find_required_table(b"cmap"));
         info.loca = try!(info.find_required_table(b"loca"));
         info.glyf = try!(info.find_required_table(b"glyf"));
-        info.hmtx = try!(info.find_required_table(b"hmtx"));
         info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
 
         // find a cmap encoding table we understand *now* to avoid searching
@@ -1333,31 +1336,6 @@ pub unsafe fn get_glyph_shape(
    return num_vertices;
 }
 
-pub unsafe fn get_glyph_hmetrics(
-    info: *const FontInfo,
-    glyph_index: isize,
-    advance_width: *mut isize,
-    left_side_bearing: *mut isize
-) {
-   let num_of_long_hor_metrics = (*info).hhea.num_of_long_hor_metrics();
-   if glyph_index < num_of_long_hor_metrics as isize {
-      if advance_width != null_mut() {
-          *advance_width    = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*glyph_index)) as isize;
-      }
-      if left_side_bearing != null_mut() {
-          *left_side_bearing = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*glyph_index + 2)) as isize;
-      }
-   } else {
-      if advance_width != null_mut() {
-          *advance_width    = ttSHORT!((*info).data.as_ptr().offset((*info).hmtx as isize + 4*(num_of_long_hor_metrics as isize -1))) as isize;
-      }
-      if left_side_bearing != null_mut() {
-          *left_side_bearing = ttSHORT!((*info).data.as_ptr().offset(
-              (*info).hmtx as isize + 4*num_of_long_hor_metrics as isize + 2*(glyph_index - num_of_long_hor_metrics as isize))) as isize;
-      }
-   }
-}
-
 pub unsafe fn get_glyph_kern_advance(
     info: *mut FontInfo,
     glyph1: isize,
@@ -1420,7 +1398,11 @@ pub unsafe fn get_codepoint_hmetrics(
     advance_width: *mut isize,
     left_side_bearing: *mut isize
 ) {
-   get_glyph_hmetrics(info, find_glyph_index(info,codepoint), advance_width, left_side_bearing);
+    let i = find_glyph_index(info,codepoint);
+    assert!(i >= 0);
+    let metric = (*info).hmtx.hmetric_for_glyph_at_index(i as usize);
+    *advance_width = metric.advance_width as isize;
+    *left_side_bearing = metric.left_side_bearing as isize;
 }
 
 
@@ -2740,8 +2722,6 @@ pub unsafe fn bake_font_bitmap(
     scale = f.scale_for_pixel_height(pixel_height);
 
    for i in 0..num_chars {
-      let mut advance: isize = 0;
-      let mut lsb: isize = 0;
       let mut x0: isize = 0;
       let mut y0: isize = 0;
       let mut x1: isize = 0;
@@ -2749,7 +2729,10 @@ pub unsafe fn bake_font_bitmap(
       let gw: isize;
       let gh: isize;
       let g: isize = find_glyph_index(&f, first_char + i);
-      get_glyph_hmetrics(&f, g, &mut advance, &mut lsb);
+
+      assert!(g >= 0);
+      let metric = f.hmtx.hmetric_for_glyph_at_index(g as usize);
+
       get_glyph_bitmap_box(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
       gw = x1-x0;
       gh = y1-y0;
@@ -2767,7 +2750,7 @@ pub unsafe fn bake_font_bitmap(
       (*chardata.offset(i)).y0 = y as u16;
       (*chardata.offset(i)).x1 = (x + gw) as u16;
       (*chardata.offset(i)).y1 = (y + gh) as u16;
-      (*chardata.offset(i)).xadvance = scale * advance as f32;
+      (*chardata.offset(i)).xadvance = scale * metric.advance_width as f32;
       (*chardata.offset(i)).xoff     = x0 as f32;
       (*chardata.offset(i)).yoff     = y0 as f32;
       x = x + gw + 1;
@@ -3252,8 +3235,6 @@ pub unsafe fn pack_font_ranges_render_into_rects(
          let r: *mut Rect = rects.offset(k);
          if (*r).was_packed != 0 {
             let bc: *mut PackedChar = (*ranges.offset(i)).chardata_for_range.offset(j);
-            let mut advance: isize = 0;
-            let mut lsb: isize = 0;
             let mut x0: isize = 0;
             let mut y0: isize = 0;
             let mut x1: isize = 0;
@@ -3272,7 +3253,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
             (*r).y += pad;
             (*r).w -= pad;
             (*r).h -= pad;
-            get_glyph_hmetrics(info, glyph, &mut advance, &mut lsb);
+
             get_glyph_bitmap_box(info, glyph,
                                     scale * (*spc).h_oversample as f32,
                                     scale * (*spc).v_oversample as f32,
@@ -3299,11 +3280,14 @@ pub unsafe fn pack_font_ranges_render_into_rects(
                                   (*spc).v_oversample);
             }
 
+            assert!(glyph >= 0);
+            let metric = (*info).hmtx.hmetric_for_glyph_at_index(glyph as usize);
+
             (*bc).x0 = (*r).x as u16;
             (*bc).y0 = (*r).y as u16;
             (*bc).x1 = ((*r).x + (*r).w) as u16;
             (*bc).y1 = ((*r).y + (*r).h) as u16;
-            (*bc).xadvance = scale * advance as f32;
+            (*bc).xadvance = scale * metric.advance_width as f32;
             (*bc).xoff = x0 as f32 * recip_h + sub_x;
             (*bc).yoff = y0 as f32 * recip_v + sub_y;
             (*bc).xoff2 = (x0 + (*r).w) as f32 * recip_h + sub_x;

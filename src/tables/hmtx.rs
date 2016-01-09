@@ -74,6 +74,21 @@ impl HMTX {
         }
         data
     }
+
+    /// Returns a horizontal metric for a glyph at a given index.
+    pub fn hmetric_for_glyph_at_index(&self, i: usize) -> LongHorizontalMetric {
+        if let Some(&metric) = self.metrics.get(i) {
+            metric
+        } else {
+            // It's safe to `unwrap` here, since valid font should contain
+            // at least one entry of horizontal metrics.
+            let mut metric = *self.metrics.last().unwrap();
+            if let Some(&lsb) = self.left_side_bearings.get(i - self.metrics.len()) {
+                metric.left_side_bearing = lsb;
+            }
+            metric
+        }
+    }
 }
 
 #[cfg(test)]

@@ -50,6 +50,11 @@ impl MAXP {
         data.write_u16::<BigEndian>(self.num_glyphs).unwrap();
         data
     }
+
+    /// Returns the number of glyphs in the font.
+    pub fn num_glyphs(&self) -> u32 {
+        self.num_glyphs as u32
+    }
 }
 
 #[cfg(test)]

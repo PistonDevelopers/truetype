@@ -254,7 +254,7 @@ use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::{HHEA, HEAD};
+use tables::{HHEA, HEAD, MAXP};
 
 mod error;
 mod tables;
@@ -416,11 +416,10 @@ pub struct FontInfo<'a> {
    data: &'a [u8],
    // offset of start of font
    fontstart: usize,
-   // number of glyphs, needed for range checking
-   num_glyphs: usize,
 
    hhea: HHEA,
    head: HEAD,
+   maxp: MAXP,
 
    // table locations as offset from start of .ttf
    loca: usize,
@@ -438,9 +437,9 @@ impl<'a> FontInfo<'a> {
         let mut info = FontInfo{
             data: data,
             fontstart: 0,
-            num_glyphs: 0,
             hhea: HHEA::default(),
             head: HEAD::default(),
+            maxp: MAXP::default(),
             loca: 0,
             glyf: 0,
             hmtx: 0,
@@ -454,17 +453,14 @@ impl<'a> FontInfo<'a> {
         info.hhea = try!(HHEA::from_data(&data, hhea_offset));
         let head_offset = try!(info.find_required_table(b"head"));
         info.head = try!(HEAD::from_data(&data, head_offset));
+        let maxp_offset = try!(info.find_required_table(b"maxp"));
+        info.maxp = try!(MAXP::from_data(&data, maxp_offset));
 
         let cmap = try!(info.find_required_table(b"cmap"));
         info.loca = try!(info.find_required_table(b"loca"));
         info.glyf = try!(info.find_required_table(b"glyf"));
         info.hmtx = try!(info.find_required_table(b"hmtx"));
         info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
-
-        info.num_glyphs = match try!(info.find_table(b"maxp")) {
-            Some(maxp) => try!(info.read_u16(maxp + 4)) as usize,
-            None => 0xffff
-        };
 
         // find a cmap encoding table we understand *now* to avoid searching
         // later. (todo: could make this installable)
@@ -963,7 +959,7 @@ pub unsafe fn get_glyph_offset(
    let g1: isize;
    let g2: isize;
 
-   if glyph_index >= (*info).num_glyphs as isize { return -1; } // glyph index out of range
+   if glyph_index >= (*info).maxp.num_glyphs() as isize { return -1; } // glyph index out of range
    if (*info).head.index_to_loc_format() >= 2   { return -1; } // unknown index->glyph map format
 
    if (*info).head.index_to_loc_format() == 0 {

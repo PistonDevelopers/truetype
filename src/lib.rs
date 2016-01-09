@@ -250,7 +250,6 @@ extern crate expectest;
 
 use std::ptr::{ null, null_mut };
 use std::mem::size_of;
-use std::ffi::CString;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };

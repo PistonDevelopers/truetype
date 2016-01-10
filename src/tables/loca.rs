@@ -80,8 +80,15 @@ impl LOCA {
 
     /// Returns the offset to the location of the glyph in the font
     /// relative to the beginning of the 'glyf' table.
+    ///
+    /// Returns `None` if `i` is out of bounds or if the font does not contain
+    /// an outline for the glyph at index `i`.
     pub fn offset_for_glyph_at_index(&self, i: usize) -> Option<usize> {
-        self.offsets.get(i).map(|&n| n as usize)
+        if let (Some(c), Some(n)) = (self.offsets.get(i), self.offsets.get(i + 1)) {
+            if c == n { None } else { Some(*c as usize) }
+        } else {
+            None
+        }
     }
 }
 

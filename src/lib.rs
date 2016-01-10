@@ -541,6 +541,14 @@ impl<'a> FontInfo<'a> {
     pub fn scale_for_mapping_em_to_pixels(&self, pixels: f32) -> f32 {
        pixels / self.head.units_per_em()
     }
+
+    /// Returns the offset to the location of the glyph in the font.
+    ///
+    /// Returns `None` if `i` is out of bounds or if the font does not contain
+    /// an outline for the glyph at index `i`.
+    pub fn offset_for_glyph_at_index(&self, i: usize) -> Option<usize> {
+        self.loca.offset_for_glyph_at_index(i).map(|c| c + self.glyf)
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -956,21 +964,6 @@ pub unsafe fn stbtt_setvertex(
    (*v).cy = cy as i16;
 }
 
-pub unsafe fn get_glyph_offset(
-    info: *const FontInfo,
-    glyph_index: isize
-) -> isize {
-
-    if glyph_index >= (*info).maxp.num_glyphs() as isize { return -1; } // glyph index out of range
-    assert!(glyph_index >= 0);
-    let i = glyph_index as usize;
-    let g1 = (*info).glyf as isize + (*info).loca.offset_for_glyph_at_index(i).unwrap_or(0) as isize;
-    let g2 = (*info).glyf as isize + (*info).loca.offset_for_glyph_at_index(i + 1).unwrap_or(0) as isize;
-
-    return if g1==g2 { -1 } else { g1 }; // if length is 0, return -1
-}
-
-// as above, but takes one or more glyph indices for greater efficiency
 pub unsafe fn get_glyph_box(
     info: *const FontInfo,
     glyph_index: isize,
@@ -979,14 +972,15 @@ pub unsafe fn get_glyph_box(
     x1: *mut isize,
     y1: *mut isize
 ) -> isize {
-   let g: isize = get_glyph_offset(info, glyph_index);
-   if g < 0 { return 0; }
-
-   if x0 != null_mut() { *x0 = ttSHORT!((*info).data.as_ptr().offset(g + 2)) as isize; }
-   if y0 != null_mut() { *y0 = ttSHORT!((*info).data.as_ptr().offset(g + 4)) as isize; }
-   if x1 != null_mut() { *x1 = ttSHORT!((*info).data.as_ptr().offset(g + 6)) as isize; }
-   if y1 != null_mut() { *y1 = ttSHORT!((*info).data.as_ptr().offset(g + 8)) as isize; }
-   return 1;
+    if let Some(g) = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize) {
+        if x0 != null_mut() { *x0 = ttSHORT!((*info).data.as_ptr().offset(g + 2)) as isize; }
+        if y0 != null_mut() { *y0 = ttSHORT!((*info).data.as_ptr().offset(g + 4)) as isize; }
+        if x1 != null_mut() { *x1 = ttSHORT!((*info).data.as_ptr().offset(g + 6)) as isize; }
+        if y1 != null_mut() { *y1 = ttSHORT!((*info).data.as_ptr().offset(g + 8)) as isize; }
+        1
+    } else {
+        0
+    }
 }
 
 // Gets the bounding box of the visible part of the glyph, in unscaled coordinates
@@ -1006,11 +1000,12 @@ pub unsafe fn is_glyph_empty(
     info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
-   let number_of_contours: i16;
-   let g: isize = get_glyph_offset(info, glyph_index);
-   if g < 0 { return 1; }
-   number_of_contours = ttSHORT!((*info).data.as_ptr().offset(g));
-   return if number_of_contours == 0 { 0 } else { 1 };
+    if let Some(g) = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize) {
+        let number_of_contours = ttSHORT!((*info).data.as_ptr().offset(g));
+        if number_of_contours == 0 { 0 } else { 1 }
+    } else {
+        1
+    }
 }
 
 pub unsafe fn close_shape(
@@ -1064,7 +1059,7 @@ pub unsafe fn get_glyph_shape(
    let data: *const u8 = (*info).data.as_ptr();
    let mut vertices: *mut Vertex=null_mut();
    let mut num_vertices: isize =0;
-   let g: isize = get_glyph_offset(info, glyph_index);
+   let g = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize).unwrap_or(-1);
 
    *pvertices = null_mut();
 

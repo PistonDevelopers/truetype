@@ -253,7 +253,7 @@ use std::mem::size_of;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::{HHEA, HEAD, MAXP, HMTX};
+use tables::{HHEA, HEAD, MAXP, HMTX, LOCA};
 
 mod error;
 mod tables;
@@ -420,9 +420,9 @@ pub struct FontInfo<'a> {
    head: HEAD,
    maxp: MAXP,
    hmtx: HMTX,
+   loca: LOCA,
 
    // table locations as offset from start of .ttf
-   loca: usize,
    glyf: usize,
    kern: usize,
    // a cmap mapping for our chosen character encoding
@@ -440,7 +440,7 @@ impl<'a> FontInfo<'a> {
             head: HEAD::default(),
             maxp: MAXP::default(),
             hmtx: HMTX::default(),
-            loca: 0,
+            loca: LOCA::default(),
             glyf: 0,
             kern: 0,
             index_map: 0,
@@ -458,9 +458,11 @@ impl<'a> FontInfo<'a> {
         let metrics = info.hhea.num_of_long_hor_metrics();
         let glyphs = info.maxp.num_glyphs();
         info.hmtx = try!(HMTX::from_data(&data, hmtx_offset, metrics, glyphs));
+        let loca_offset = try!(info.find_required_table(b"loca"));
+        info.loca = try!(LOCA::from_data(&data, loca_offset, glyphs, info.head.location_format()));
 
         let cmap = try!(info.find_required_table(b"cmap"));
-        info.loca = try!(info.find_required_table(b"loca"));
+
         info.glyf = try!(info.find_required_table(b"glyf"));
         info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
 
@@ -958,23 +960,13 @@ pub unsafe fn get_glyph_offset(
     info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
-    use types::LocationFormat;
-
-    let g1: isize;
-    let g2: isize;
 
     if glyph_index >= (*info).maxp.num_glyphs() as isize { return -1; } // glyph index out of range
+    assert!(glyph_index >= 0);
+    let i = glyph_index as usize;
+    let g1 = (*info).glyf as isize + (*info).loca.offset_for_glyph_at_index(i).unwrap_or(0) as isize;
+    let g2 = (*info).glyf as isize + (*info).loca.offset_for_glyph_at_index(i + 1).unwrap_or(0) as isize;
 
-    match (*info).head.location_format() {
-        LocationFormat::Short => {
-            g1 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2)) as isize * 2;
-            g2 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2 + 2)) as isize * 2;
-        },
-        LocationFormat::Long => {
-            g1 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4)) as isize;
-            g2 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4 + 4)) as isize;
-        },
-    }
     return if g1==g2 { -1 } else { g1 }; // if length is 0, return -1
 }
 

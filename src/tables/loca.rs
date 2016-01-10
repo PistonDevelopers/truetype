@@ -77,6 +77,12 @@ impl LOCA {
         }
         data
     }
+
+    /// Returns the offset to the location of the glyph in the font
+    /// relative to the beginning of the 'glyf' table.
+    pub fn offset_for_glyph_at_index(&self, i: usize) -> Option<usize> {
+        self.offsets.get(i).map(|&n| n as usize)
+    }
 }
 
 #[cfg(test)]

@@ -958,21 +958,24 @@ pub unsafe fn get_glyph_offset(
     info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
-   let g1: isize;
-   let g2: isize;
+    use types::LocationFormat;
 
-   if glyph_index >= (*info).maxp.num_glyphs() as isize { return -1; } // glyph index out of range
-   if (*info).head.index_to_loc_format() >= 2   { return -1; } // unknown index->glyph map format
+    let g1: isize;
+    let g2: isize;
 
-   if (*info).head.index_to_loc_format() == 0 {
-      g1 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2)) as isize * 2;
-      g2 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2 + 2)) as isize * 2;
-   } else {
-      g1 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4)) as isize;
-      g2 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4 + 4)) as isize;
-   }
+    if glyph_index >= (*info).maxp.num_glyphs() as isize { return -1; } // glyph index out of range
 
-   return if g1==g2 { -1 } else { g1 }; // if length is 0, return -1
+    match (*info).head.location_format() {
+        LocationFormat::Short => {
+            g1 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2)) as isize * 2;
+            g2 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2 + 2)) as isize * 2;
+        },
+        LocationFormat::Long => {
+            g1 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4)) as isize;
+            g2 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4 + 4)) as isize;
+        },
+    }
+    return if g1==g2 { -1 } else { g1 }; // if length is 0, return -1
 }
 
 // as above, but takes one or more glyph indices for greater efficiency

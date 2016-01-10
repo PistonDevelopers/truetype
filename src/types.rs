@@ -10,3 +10,12 @@ pub struct BBox {
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub struct Fixed(pub i32);
+
+/// Indicates the type of offset format used in the index to loc ('loca') table.
+///
+/// Taken from `indexToLocFormat` field of the `head` font table.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum LocationFormat {
+    Short,
+    Long,
+}

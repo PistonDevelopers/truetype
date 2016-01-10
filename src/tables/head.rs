@@ -2,7 +2,7 @@
 use types::Fixed;
 use Error;
 use Result;
-use types::BBox;
+use types::{BBox, LocationFormat};
 use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -26,7 +26,9 @@ pub struct HEAD {
     mac_style: u16,
     lowest_rec_ppem: u16,
     font_direction_hint: i16,
-    index_to_loc_format: i16,
+    index_to_loc_format: u16, // In TrueType Reference Manual this field marked
+                              // as `i16` but we changed it to `u16`
+                              // since it can hold only 0 or 1.
     glyph_data_format: i16,
 }
 
@@ -65,8 +67,10 @@ impl HEAD {
         head.mac_style = try!(cursor.read_u16::<BigEndian>());
         head.lowest_rec_ppem = try!(cursor.read_u16::<BigEndian>());
         head.font_direction_hint = try!(cursor.read_i16::<BigEndian>());
-        // TODO: Add error handling. index_to_loc_format can be 0 or 1.
-        head.index_to_loc_format = try!(cursor.read_i16::<BigEndian>());
+        head.index_to_loc_format = try!(cursor.read_u16::<BigEndian>());
+        if head.index_to_loc_format > 1 {
+            return Err(Error::UnknownLocationFormat);
+        }
         head.glyph_data_format = try!(cursor.read_i16::<BigEndian>());
 
         Ok(head)
@@ -92,7 +96,7 @@ impl HEAD {
         data.write_u16::<BigEndian>(self.mac_style).unwrap();
         data.write_u16::<BigEndian>(self.lowest_rec_ppem).unwrap();
         data.write_i16::<BigEndian>(self.font_direction_hint).unwrap();
-        data.write_i16::<BigEndian>(self.index_to_loc_format).unwrap();
+        data.write_u16::<BigEndian>(self.index_to_loc_format).unwrap();
         data.write_i16::<BigEndian>(self.glyph_data_format).unwrap();
         data
     }
@@ -115,9 +119,13 @@ impl HEAD {
         }
     }
 
-    // TODO: Should return enum that denotes short or long offsets.
-    pub fn index_to_loc_format(&self) -> i16 {
-        self.index_to_loc_format
+    /// Returns the type of offset format used in the index to loc ('loca') table.
+    pub fn location_format(&self) -> LocationFormat {
+        match self.index_to_loc_format {
+            0 => LocationFormat::Short,
+            1 => LocationFormat::Long,
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -137,8 +145,12 @@ mod tests {
         let head = HEAD::from_data(&data, offset).unwrap();
         assert_eq!(head.bytes(), &data[offset..offset + SIZE]);
 
-        let head = HEAD::default();
+        let mut head = HEAD::default();
         expect!(HEAD::from_data(&head.bytes(), 0)).to(be_err().value(HEADVersionIsNotSupported));
+
+        head.version = ::types::Fixed(0x00010000);
+        head.index_to_loc_format = 2;
+        expect!(HEAD::from_data(&head.bytes(), 0)).to(be_err().value(UnknownLocationFormat));
 
         expect!(HEAD::from_data(&data, data.len())).to(be_err().value(Malformed));
     }

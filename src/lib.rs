@@ -253,7 +253,7 @@ use std::mem::size_of;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::{HHEA, HEAD, MAXP, HMTX};
+use tables::{HHEA, HEAD, MAXP, HMTX, LOCA};
 
 mod error;
 mod tables;
@@ -418,11 +418,10 @@ pub struct FontInfo<'a> {
 
    hhea: HHEA,
    head: HEAD,
-   maxp: MAXP,
    hmtx: HMTX,
+   loca: LOCA,
 
    // table locations as offset from start of .ttf
-   loca: usize,
    glyf: usize,
    kern: usize,
    // a cmap mapping for our chosen character encoding
@@ -433,43 +432,38 @@ impl<'a> FontInfo<'a> {
     // Given an offset into the file that defines a font, this function builds
     // the necessary cached info for the rest of the system.
     pub fn new_with_offset(data: &[u8], fontstart: usize) -> Result<FontInfo> {
-        let mut info = FontInfo{
-            data: data,
-            fontstart: 0,
-            hhea: HHEA::default(),
-            head: HEAD::default(),
-            maxp: MAXP::default(),
-            hmtx: HMTX::default(),
-            loca: 0,
-            glyf: 0,
-            kern: 0,
-            index_map: 0,
-        };
+        use utils::{find_table_offset, find_required_table_offset};
 
-        info.fontstart = fontstart;
+        let hhea = try!(HHEA::from_data(&data,
+                        try!(find_required_table_offset(data, fontstart, b"hhea"))));
 
-        let hhea_offset = try!(info.find_required_table(b"hhea"));
-        info.hhea = try!(HHEA::from_data(&data, hhea_offset));
-        let head_offset = try!(info.find_required_table(b"head"));
-        info.head = try!(HEAD::from_data(&data, head_offset));
-        let maxp_offset = try!(info.find_required_table(b"maxp"));
-        info.maxp = try!(MAXP::from_data(&data, maxp_offset));
-        let hmtx_offset = try!(info.find_required_table(b"hmtx"));
-        let metrics = info.hhea.num_of_long_hor_metrics();
-        let glyphs = info.maxp.num_glyphs();
-        info.hmtx = try!(HMTX::from_data(&data, hmtx_offset, metrics, glyphs));
+        let head = try!(HEAD::from_data(&data,
+                        try!(find_required_table_offset(data, fontstart, b"head"))));
 
-        let cmap = try!(info.find_required_table(b"cmap"));
-        info.loca = try!(info.find_required_table(b"loca"));
-        info.glyf = try!(info.find_required_table(b"glyf"));
-        info.kern = try!(info.find_table(b"kern")).unwrap_or(0);
+        let maxp = try!(MAXP::from_data(&data,
+                        try!(find_required_table_offset(data, fontstart, b"maxp"))));
+
+        let hmtx = try!(HMTX::from_data(&data,
+                        try!(find_required_table_offset(data, fontstart, b"hmtx")),
+                        hhea.num_of_long_hor_metrics(),
+                        maxp.num_glyphs()));
+
+        let loca = try!(LOCA::from_data(&data,
+                        try!(find_required_table_offset(data, fontstart, b"loca")),
+                        maxp.num_glyphs(),
+                        head.location_format()));
+
+        let cmap = try!(find_required_table_offset(data, fontstart, b"cmap"));
+
+        let glyf = try!(find_required_table_offset(data, fontstart, b"glyf"));
+        let kern = try!(find_table_offset(data, fontstart, b"kern")).unwrap_or(0);
 
         // find a cmap encoding table we understand *now* to avoid searching
         // later. (todo: could make this installable)
         // the same regardless of glyph.
-        let num_tables = try!(info.read_u16(cmap + 2));
-        info.index_map = 0;
-        for encoding_record in info.data[cmap + 4..].chunks(8).take(num_tables as usize) {
+        let num_tables = BigEndian::read_u16(&data[cmap + 2..]);
+        let mut index_map = 0;
+        for encoding_record in data[cmap + 4..].chunks(8).take(num_tables as usize) {
             if encoding_record.len() != 8 {
                 return Err(Error::Malformed);
             }
@@ -481,7 +475,7 @@ impl<'a> FontInfo<'a> {
                         MsEid::UnicodeBmp
                         | MsEid::UnicodeFull => {
                             // MS/Unicode
-                            info.index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
+                            index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
                         }
                         _ => {
                             // TODO: Check extra cases.
@@ -491,36 +485,30 @@ impl<'a> FontInfo<'a> {
                 PlatformId::Unicode => {
                     // Mac/iOS has these
                     // all the encodingIDs are unicode, so we don't bother to check it
-                    info.index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
+                    index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
                 }
                 _ => {
                     // TODO: Mac not supported?
                 }
             }
         }
-        if info.index_map == 0 {
+        if index_map == 0 {
             return Err(Error::MissingTable);
         }
 
+        let info = FontInfo {
+            data: data,
+            fontstart: fontstart,
+            hhea: hhea,
+            head: head,
+            hmtx: hmtx,
+            loca: loca,
+            glyf: glyf,
+            kern: kern,
+            index_map: index_map,
+        };
+
         Ok(info)
-    }
-
-    fn read_u16(&self, offset: usize) -> Result<u16> {
-        if offset + 2 > self.data.len() {
-            return Err(Error::Malformed);
-        }
-        Ok(BigEndian::read_u16(&self.data[offset..offset + 2]))
-    }
-
-    fn find_required_table(&self, tag: &[u8; 4]) -> Result<usize> {
-        match try!(self.find_table(tag)) {
-            Some(offset) => Ok(offset),
-            None => Err(Error::MissingTable)
-        }
-    }
-
-    fn find_table(&self, tag: &[u8; 4]) -> Result<Option<usize>> {
-        utils::find_table_offset(self.data, self.fontstart, tag)
     }
 
     // computes a scale factor to produce a font whose "height" is 'pixels' tall.
@@ -538,6 +526,14 @@ impl<'a> FontInfo<'a> {
     /// I'm not positive.
     pub fn scale_for_mapping_em_to_pixels(&self, pixels: f32) -> f32 {
        pixels / self.head.units_per_em()
+    }
+
+    /// Returns the offset to the location of the glyph in the font.
+    ///
+    /// Returns `None` if `i` is out of bounds or if the font does not contain
+    /// an outline for the glyph at index `i`.
+    pub fn offset_for_glyph_at_index(&self, i: usize) -> Option<usize> {
+        self.loca.offset_for_glyph_at_index(i).map(|c| c + self.glyf)
     }
 }
 
@@ -954,28 +950,6 @@ pub unsafe fn stbtt_setvertex(
    (*v).cy = cy as i16;
 }
 
-pub unsafe fn get_glyph_offset(
-    info: *const FontInfo,
-    glyph_index: isize
-) -> isize {
-   let g1: isize;
-   let g2: isize;
-
-   if glyph_index >= (*info).maxp.num_glyphs() as isize { return -1; } // glyph index out of range
-   if (*info).head.index_to_loc_format() >= 2   { return -1; } // unknown index->glyph map format
-
-   if (*info).head.index_to_loc_format() == 0 {
-      g1 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2)) as isize * 2;
-      g2 = (*info).glyf as isize + ttUSHORT!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 2 + 2)) as isize * 2;
-   } else {
-      g1 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4)) as isize;
-      g2 = (*info).glyf as isize + ttULONG!((*info).data.as_ptr().offset((*info).loca as isize + glyph_index * 4 + 4)) as isize;
-   }
-
-   return if g1==g2 { -1 } else { g1 }; // if length is 0, return -1
-}
-
-// as above, but takes one or more glyph indices for greater efficiency
 pub unsafe fn get_glyph_box(
     info: *const FontInfo,
     glyph_index: isize,
@@ -984,14 +958,15 @@ pub unsafe fn get_glyph_box(
     x1: *mut isize,
     y1: *mut isize
 ) -> isize {
-   let g: isize = get_glyph_offset(info, glyph_index);
-   if g < 0 { return 0; }
-
-   if x0 != null_mut() { *x0 = ttSHORT!((*info).data.as_ptr().offset(g + 2)) as isize; }
-   if y0 != null_mut() { *y0 = ttSHORT!((*info).data.as_ptr().offset(g + 4)) as isize; }
-   if x1 != null_mut() { *x1 = ttSHORT!((*info).data.as_ptr().offset(g + 6)) as isize; }
-   if y1 != null_mut() { *y1 = ttSHORT!((*info).data.as_ptr().offset(g + 8)) as isize; }
-   return 1;
+    if let Some(g) = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize) {
+        if x0 != null_mut() { *x0 = ttSHORT!((*info).data.as_ptr().offset(g + 2)) as isize; }
+        if y0 != null_mut() { *y0 = ttSHORT!((*info).data.as_ptr().offset(g + 4)) as isize; }
+        if x1 != null_mut() { *x1 = ttSHORT!((*info).data.as_ptr().offset(g + 6)) as isize; }
+        if y1 != null_mut() { *y1 = ttSHORT!((*info).data.as_ptr().offset(g + 8)) as isize; }
+        1
+    } else {
+        0
+    }
 }
 
 // Gets the bounding box of the visible part of the glyph, in unscaled coordinates
@@ -1011,11 +986,12 @@ pub unsafe fn is_glyph_empty(
     info: *const FontInfo,
     glyph_index: isize
 ) -> isize {
-   let number_of_contours: i16;
-   let g: isize = get_glyph_offset(info, glyph_index);
-   if g < 0 { return 1; }
-   number_of_contours = ttSHORT!((*info).data.as_ptr().offset(g));
-   return if number_of_contours == 0 { 0 } else { 1 };
+    if let Some(g) = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize) {
+        let number_of_contours = ttSHORT!((*info).data.as_ptr().offset(g));
+        if number_of_contours == 0 { 0 } else { 1 }
+    } else {
+        1
+    }
 }
 
 pub unsafe fn close_shape(
@@ -1069,7 +1045,7 @@ pub unsafe fn get_glyph_shape(
    let data: *const u8 = (*info).data.as_ptr();
    let mut vertices: *mut Vertex=null_mut();
    let mut num_vertices: isize =0;
-   let g: isize = get_glyph_offset(info, glyph_index);
+   let g = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize).unwrap_or(-1);
 
    *pvertices = null_mut();
 

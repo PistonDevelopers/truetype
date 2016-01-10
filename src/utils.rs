@@ -20,6 +20,15 @@ pub fn find_table_offset(data: &[u8], fontstart: usize, tag: &[u8; 4]) -> Result
     return Ok(None);
 }
 
+/// Attempts to find the table offset in `data` for a required font table `tag`
+/// starting from a `fontstart` offset.
+pub fn find_required_table_offset(data: &[u8], fontstart: usize, tag: &[u8; 4]) -> Result<usize> {
+    match try!(find_table_offset(data, fontstart, tag)) {
+        Some(offset) => Ok(offset),
+        None => Err(Error::MissingTable)
+    }
+}
+
 /// Compatibility with unsafe code. TODO: Remove as soon as possible.
 pub unsafe fn find_table(data: *const u8, fontstart: u32, tag: &[u8; 4]) -> u32 {
     let slice = ::std::slice::from_raw_parts(data, 1024); // DANGER: Don't care about size.

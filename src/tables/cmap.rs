@@ -33,7 +33,7 @@ impl CMAP {
             })
         }).collect();
 
-        encoding_subtables.sort_by(|a, b| a.platform.order().cmp(&b.platform.order()));
+        encoding_subtables.sort_by(|a, b| a.order().cmp(&b.order()));
 
         if encoding_subtables.is_empty() {
             return Err(Error::CMAPEncodingSubtableIsNotSupported);
@@ -54,6 +54,26 @@ impl CMAP {
 struct EncodingSubtable {
     platform: Platform,
     offset: u32,
+}
+
+impl EncodingSubtable {
+    /// Defines an order in which the encoding subtables should be selected.
+    fn order(&self) -> u32 {
+        use self::Platform::*;
+        use self::UnicodeEncodingId::*;
+        use self::MicrosoftEncodingId::*;
+
+        match self.platform {
+            Unicode(Unicode20) => 0,
+            Unicode(Unicode20BMPOnly) => 1,
+            Unicode(Version11Semantics) => 1,
+            Unicode(DefaultSemantics) => 1,
+            Microsoft(UnicodeUCS4) => 2,
+            Microsoft(UnicodeUCS2) => 3,
+            Microsoft(Symbol) => 4,
+            _ => 10,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -89,23 +109,6 @@ impl Platform {
                 _ => None,
             },
             _ => None,
-        }
-    }
-
-    fn order(&self) -> u32 {
-        use self::Platform::*;
-        use self::UnicodeEncodingId::*;
-        use self::MicrosoftEncodingId::*;
-
-        match *self {
-            Unicode(Unicode20) => 0,
-            Unicode(Unicode20BMPOnly) => 1,
-            Unicode(Version11Semantics) => 1,
-            Unicode(DefaultSemantics) => 1,
-            Microsoft(UnicodeUCS4) => 2,
-            Microsoft(UnicodeUCS2) => 3,
-            Microsoft(Symbol) => 4,
-            _ => 10,
         }
     }
 }

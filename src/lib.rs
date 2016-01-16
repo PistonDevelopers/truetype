@@ -253,7 +253,7 @@ use std::mem::size_of;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::{HHEA, HEAD, MAXP, HMTX, LOCA};
+use tables::{HHEA, HEAD, MAXP, HMTX, LOCA, CMAP};
 
 mod error;
 mod tables;
@@ -420,12 +420,11 @@ pub struct FontInfo<'a> {
    head: HEAD,
    hmtx: HMTX,
    loca: LOCA,
+   cmap: CMAP,
 
    // table locations as offset from start of .ttf
    glyf: usize,
    kern: usize,
-   // a cmap mapping for our chosen character encoding
-   index_map: usize,
 }
 
 impl<'a> FontInfo<'a> {
@@ -453,48 +452,11 @@ impl<'a> FontInfo<'a> {
                         maxp.num_glyphs(),
                         head.location_format()));
 
-        let cmap = try!(find_required_table_offset(data, fontstart, b"cmap"));
+        let cmap = try!(CMAP::from_data(&data,
+                        try!(find_required_table_offset(data, fontstart, b"cmap"))));
 
         let glyf = try!(find_required_table_offset(data, fontstart, b"glyf"));
         let kern = try!(find_table_offset(data, fontstart, b"kern")).unwrap_or(0);
-
-        // find a cmap encoding table we understand *now* to avoid searching
-        // later. (todo: could make this installable)
-        // the same regardless of glyph.
-        let num_tables = BigEndian::read_u16(&data[cmap + 2..]);
-        let mut index_map = 0;
-        for encoding_record in data[cmap + 4..].chunks(8).take(num_tables as usize) {
-            if encoding_record.len() != 8 {
-                return Err(Error::Malformed);
-            }
-            let val: PlatformId = BigEndian::read_u16(&encoding_record[0..2]).into();
-            match val {
-                PlatformId::Microsoft => {
-                    let val: MsEid = BigEndian::read_u16(&encoding_record[2..4]).into();
-                    match val {
-                        MsEid::UnicodeBmp
-                        | MsEid::UnicodeFull => {
-                            // MS/Unicode
-                            index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
-                        }
-                        _ => {
-                            // TODO: Check extra cases.
-                        }
-                    }
-                }
-                PlatformId::Unicode => {
-                    // Mac/iOS has these
-                    // all the encodingIDs are unicode, so we don't bother to check it
-                    index_map = cmap + BigEndian::read_u32(&encoding_record[4..8]) as usize;
-                }
-                _ => {
-                    // TODO: Mac not supported?
-                }
-            }
-        }
-        if index_map == 0 {
-            return Err(Error::MissingTable);
-        }
 
         let info = FontInfo {
             data: data,
@@ -503,9 +465,9 @@ impl<'a> FontInfo<'a> {
             head: head,
             hmtx: hmtx,
             loca: loca,
+            cmap: cmap,
             glyf: glyf,
             kern: kern,
-            index_map: index_map,
         };
 
         Ok(info)
@@ -605,63 +567,6 @@ pub struct Bitmap
 // const STBTT_MACSTYLE_ITALIC: u8 = 2;
 // const STBTT_MACSTYLE_UNDERSCORE: u8 = 4;
 // const STBTT_MACSTYLE_NONE: u8 = 8;   // <= not same as 0, this makes us check the bitfield is 0
-
-enum PlatformId { // platform_id
-   Unicode   =0,
-   Mac       =1,
-   Iso       =2,
-   Microsoft =3
-}
-
-impl From<u16> for PlatformId {
-    fn from(val: u16) -> PlatformId {
-        match val {
-            0 => PlatformId::Unicode,
-            1 => PlatformId::Mac,
-            2 => PlatformId::Iso,
-            3 => PlatformId::Microsoft,
-            _ => panic!("Unknown STBTT_PLATFORM_ID")
-        }
-    }
-}
-
-/*
-enum STBTT_UNICODE_EID { // encoding_id for STBTT_PLATFORM_ID_UNICODE
-   UNICODE_1_0    =0,
-   UNICODE_1_1    =1,
-   ISO_10646      =2,
-   UNICODE_2_0_BMP=3,
-   UNICODE_2_0_FULL=4
-}
-*/
-
-enum MsEid { // encoding_id for STBTT_PLATFORM_ID_MICROSOFT
-   Symbol        =0,
-   UnicodeBmp    =1,
-   ShiftJIS      =2,
-   UnicodeFull   =10
-}
-
-impl From<u16> for MsEid {
-    fn from(val: u16) -> MsEid {
-        match val {
-            0 => MsEid::Symbol,
-            1 => MsEid::UnicodeBmp,
-            2 => MsEid::ShiftJIS,
-            10 => MsEid::UnicodeFull,
-            _ => panic!("Unknown STBTT_MS_EID")
-        }
-    }
-}
-
-/*
-enum STBTT_MAC_EID { // encoding_id for STBTT_PLATFORM_ID_MAC; same as Script Manager codes
-   ROMAN        =0,   ARABIC       =4,
-   JAPANESE     =1,   HEBREW       =5,
-   CHINESE_TRAD =2,   GREEK        =6,
-   KOREAN       =3,   RUSSIAN      =7
-}
-*/
 
 /*
 enum STBTT_MS_LANG { // language_id for STBTT_PLATFORM_ID_MICROSOFT; same as LCID...
@@ -815,7 +720,7 @@ pub unsafe fn find_glyph_index(
     unicode_codepoint: isize
 ) -> isize {
    let data: *const u8 = (*info).data.as_ptr();
-   let index_map: u32 = (*info).index_map as u32;
+   let index_map: u32 = (*info).cmap.index_map() as u32;
 
    let format: u16 = ttUSHORT!(data.offset(index_map as isize + 0));
    if format == 0 { // apple byte encoding

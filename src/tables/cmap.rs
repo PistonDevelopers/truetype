@@ -6,6 +6,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 #[derive(Debug)]
 pub struct CMAP {
     encoding_subtable: EncodingSubtable,
+    cmap_offset: usize,
 }
 
 impl CMAP {
@@ -40,7 +41,12 @@ impl CMAP {
 
         Ok(CMAP {
             encoding_subtable: encoding_subtables.first().unwrap().clone(),
+            cmap_offset: offset,
         })
+    }
+
+    pub fn index_map(&self) -> usize {
+        self.encoding_subtable.offset as usize + self.cmap_offset
     }
 }
 
@@ -138,6 +144,6 @@ mod tests {
         let data = ::utils::read_file("tests/Tuffy_Bold.ttf");
         let offset = ::utils::find_table_offset(&data, 0, b"cmap").unwrap().unwrap();
 
-        let cmap = CMAP::from_data(&data, offset).unwrap();
+        let _ = CMAP::from_data(&data, offset).unwrap();
     }
 }

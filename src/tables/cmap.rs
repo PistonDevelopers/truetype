@@ -1,7 +1,7 @@
 
 use Error;
 use Result;
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 
 #[derive(Debug)]
 pub struct CMAP {
@@ -11,7 +11,7 @@ pub struct CMAP {
 
 impl CMAP {
     pub fn from_data(data: &[u8], offset: usize) -> Result<Self> {
-        use byteorder::ByteOrder;
+
         if offset >= data.len() || offset + 4 > data.len() {
             return Err(Error::Malformed);
         }
@@ -131,6 +131,41 @@ enum MicrosoftEncodingId {
     BigFive = 4,
     Johab = 5,
     UnicodeUCS4 = 10
+}
+
+#[derive(Debug)]
+struct Format0 {
+    format: u16,
+    length: u16,
+    language: u16,
+    glyph_index_array: Vec<u8>,
+}
+
+impl Format0 {
+    fn from_data(data: &[u8], offset: usize) -> Result<Self> {
+        const SIZE: usize = 262;
+        if offset + SIZE > data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let format = BigEndian::read_u16(&data[offset..]);
+        let length = BigEndian::read_u16(&data[offset + 2..]);
+        if length as usize != SIZE {
+            return Err(Error::Malformed);
+        }
+        let language = BigEndian::read_u16(&data[offset + 4..]);
+
+        Ok(Format0 {
+            format: format,
+            length: length,
+            language: language,
+            glyph_index_array: data[offset + 6..SIZE].to_owned(),
+        })
+    }
+
+    fn index_for_code(&self, code: usize) -> Option<usize> {
+        self.glyph_index_array.get(code).map(|&i| i as usize)
+    }
 }
 
 #[cfg(test)]

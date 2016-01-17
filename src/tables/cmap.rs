@@ -224,6 +224,77 @@ impl Format6 {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+struct GroupFormat1213 {
+    start_char_code: u32,
+    end_char_code: u32,
+    start_glyph_code: u32,
+}
+
+#[derive(Debug, Default)]
+struct Format1213 {
+    format: u32,
+    length: u32,
+    language: u32,
+    n_groups: u32,
+    groups: Vec<GroupFormat1213>,
+}
+
+impl Format1213 {
+    fn from_data(data: &[u8], offset: usize) -> Result<Self> {
+        if offset + 4 * 4 > data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let mut f = Format1213::default();
+        f.format = BigEndian::read_u32(&data[offset..]);
+        f.length = BigEndian::read_u32(&data[offset + 4..]);
+        f.language = BigEndian::read_u32(&data[offset + 8..]);
+        f.n_groups = BigEndian::read_u32(&data[offset + 12..]);
+
+        if offset + f.n_groups as usize * 12 > data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let data = &data[offset + 4 * 4..];
+        for n in 0..f.n_groups {
+            let z = n as usize * 3 * 4;
+            let sc = BigEndian::read_u32(&data[z..]);
+            let ec = BigEndian::read_u32(&data[z + 4..]);
+            let sg = BigEndian::read_u32(&data[z + 8..]);
+            f.groups.push(GroupFormat1213 {
+                start_char_code: sc,
+                end_char_code: ec,
+                start_glyph_code: sg
+            });
+        }
+
+        Ok(f)
+    }
+
+    fn index_for_code(&self, code: usize) -> Option<usize> {
+        use std::cmp::Ordering::*;
+
+        let group = self.groups.binary_search_by(|group| {
+            if code < group.start_char_code as usize {
+                Greater
+            } else if code > group.end_char_code as usize {
+                Less
+            } else {
+                Equal
+            }
+        }).ok().map(|i| self.groups[i]);
+
+        group.map(|group| {
+            if self.format == 12 << 16 { // format 12.0
+                code - group.start_char_code as usize + group.start_glyph_code as usize
+            } else {
+                group.start_glyph_code as usize
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

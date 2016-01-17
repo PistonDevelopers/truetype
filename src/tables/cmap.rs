@@ -1,7 +1,7 @@
 
 use Error;
 use Result;
-use byteorder::{BigEndian, ByteOrder};
+use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 
 #[derive(Debug)]
 pub struct CMAP {
@@ -168,6 +168,59 @@ impl Format0 {
 
     fn index_for_code(&self, code: usize) -> Option<usize> {
         self.glyph_index_array.get(code).map(|&i| i as usize)
+    }
+}
+
+#[derive(Debug)]
+struct Format6 {
+    format: u16,
+    length: u16,
+    language: u16,
+    first_code: u16,
+    entry_count: u16,
+    raw_glyph_index_array: Vec<u8>,
+}
+
+impl Format6 {
+    fn from_data(data: &[u8], offset: usize) -> Result<Self> {
+        if offset + 2 * 5 > data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let format = BigEndian::read_u16(&data[offset..]);
+        let length = BigEndian::read_u16(&data[offset + 2..]);
+        let language = BigEndian::read_u16(&data[offset + 4..]);
+        let first_code = BigEndian::read_u16(&data[offset + 6..]);
+        let entry_count = BigEndian::read_u16(&data[offset + 8..]);
+
+        let size = entry_count as usize * 2;
+        if offset + 2 * 5 + size > data.len() {
+            return Err(Error::Malformed);
+        }
+
+        Ok(Format6 {
+            format: format,
+            length: length,
+            language: language,
+            first_code: first_code,
+            entry_count: entry_count,
+            raw_glyph_index_array: data[offset + 2 * 5..size].to_owned(),
+        })
+    }
+
+    fn index_for_code(&self, code: usize) -> Option<usize> {
+        let first_code = self.first_code as usize;
+        let entry_count = self.entry_count as usize;
+        if code < first_code || code >= first_code + entry_count {
+            None
+        } else {
+            let offset = (code - first_code) * 2;
+            if offset >= self.raw_glyph_index_array.len() {
+                None
+            } else {
+                Some(BigEndian::read_u16(&self.raw_glyph_index_array[offset..]) as usize)
+            }
+        }
     }
 }
 

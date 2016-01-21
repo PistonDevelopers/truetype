@@ -8,6 +8,7 @@ use utils::{read_u16_from_raw_data, read_i16_from_raw_data};
 pub struct CMAP {
     encoding_subtable: EncodingSubtable,
     cmap_offset: usize,
+    format: Format,
 }
 
 impl CMAP {
@@ -19,16 +20,16 @@ impl CMAP {
 
         // +2 skip version field.
         let number_subtables = BigEndian::read_u16(&data[offset + 2..]) as usize;
-        let data = &data[offset + 4..];
+        let subtables_data = &data[offset + 4..];
         if number_subtables * (2 + 2 + 4) > data.len() {
             return Err(Error::Malformed);
         }
 
         let mut encoding_subtables: Vec<_> = (0..number_subtables).filter_map(|n| {
             let z = n as usize * 8;
-            let platform_id = BigEndian::read_u16(&data[z + 0..]);
-            let platform_specific_id = BigEndian::read_u16(&data[z + 2..]);
-            let offset = BigEndian::read_u32(&data[z + 4..]);
+            let platform_id = BigEndian::read_u16(&subtables_data[z + 0..]);
+            let platform_specific_id = BigEndian::read_u16(&subtables_data[z + 2..]);
+            let offset = BigEndian::read_u32(&subtables_data[z + 4..]);
             Platform::new(platform_id, platform_specific_id).map(|platform| {
                 EncodingSubtable { platform: platform, offset: offset}
             })
@@ -40,9 +41,13 @@ impl CMAP {
             return Err(Error::CMAPEncodingSubtableIsNotSupported);
         }
 
+        let encoding_subtable = encoding_subtables.first().unwrap().clone();
+        let format = try!(Format::from_data(data, offset + encoding_subtable.offset as usize));
+
         Ok(CMAP {
-            encoding_subtable: encoding_subtables.first().unwrap().clone(),
+            encoding_subtable: encoding_subtable,
             cmap_offset: offset,
+            format: format,
         })
     }
 
@@ -138,6 +143,32 @@ enum MicrosoftEncodingId {
 }
 
 #[derive(Debug)]
+enum Format {
+    F0(Format0),
+    F4(Format4),
+    F6(Format6),
+    F1213(Format1213),
+}
+
+impl Format {
+    fn from_data(data: &[u8], offset: usize) -> Result<Self> {
+        use self::Format::*;
+        if offset + 2 > data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let format = BigEndian::read_u16(&data[offset..]);
+        match format {
+            0 => Ok(F0(try!(Format0::from_data(data, offset)))),
+            4 => Ok(F4(try!(Format4::from_data(data, offset)))),
+            6 => Ok(F6(try!(Format6::from_data(data, offset)))),
+            12 | 13 => Ok(F1213(try!(Format1213::from_data(data, offset)))),
+            _ => Err(Error::CMAPFormatIsNotSupported),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Format0 {
     format: u16,
     length: u16,
@@ -154,6 +185,7 @@ impl Format0 {
 
         let format = BigEndian::read_u16(&data[offset..]);
         let length = BigEndian::read_u16(&data[offset + 2..]);
+
         if length as usize != SIZE {
             return Err(Error::Malformed);
         }
@@ -212,22 +244,23 @@ impl Format4 {
         f.range_shift = BigEndian::read_u16(&data[z..]);
         z += 2;
 
+
         // Check that length is correct.
         if (f.length as usize) < 2 * 8 + f.seg_count_x2 as usize * 4 {
             return Err(Error::Malformed);
         }
 
-        f.end_code = data[z..f.seg_count_x2 as usize].to_owned();
+        f.end_code = data[z..z + f.seg_count_x2 as usize].to_owned();
         z += f.seg_count_x2 as usize;
         f.reserved_pad = BigEndian::read_u16(&data[z..]);
         z += 2;
-        f.start_code = data[z..f.seg_count_x2 as usize].to_owned();
+        f.start_code = data[z..z + f.seg_count_x2 as usize].to_owned();
         z += f.seg_count_x2 as usize;
-        f.id_delta = data[z..f.seg_count_x2 as usize].to_owned();
+        f.id_delta = data[z..z + f.seg_count_x2 as usize].to_owned();
         z += f.seg_count_x2 as usize;
-        f.id_range_offset = data[z..f.seg_count_x2 as usize].to_owned();
+        f.id_range_offset = data[z..z + f.seg_count_x2 as usize].to_owned();
         z += f.seg_count_x2 as usize;
-        f.glyph_index_array = data[z..f.length as usize - z].to_owned();
+        f.glyph_index_array = data[z..z + f.length as usize].to_owned();
 
         Ok(f)
     }

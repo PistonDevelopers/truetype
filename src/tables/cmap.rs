@@ -2,6 +2,7 @@
 use Error;
 use Result;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
+use utils::{read_u16_from_raw_data, read_i16_from_raw_data};
 
 #[derive(Debug)]
 pub struct CMAP {
@@ -169,6 +170,121 @@ impl Format0 {
     fn index_for_code(&self, code: usize) -> Option<usize> {
         self.glyph_index_array.get(code).map(|&i| i as usize)
     }
+}
+
+#[derive(Debug, Default)]
+struct Format4 {
+    format: u16,
+    length: u16,
+    language: u16,
+    seg_count_x2: u16,
+    search_range: u16,
+    entry_selector: u16,
+    range_shift: u16,
+    end_code: Vec<u8>,
+    reserved_pad: u16,
+    start_code: Vec<u8>,
+    id_delta: Vec<u8>,
+    id_range_offset: Vec<u8>,
+    glyph_index_array: Vec<u8>,
+}
+
+impl Format4 {
+    fn from_data(data: &[u8], offset: usize) -> Result<Self> {
+        if offset + 2 * 8 > data.len() {
+            return Err(Error::Malformed);
+        }
+
+        let mut z = offset;
+        let mut f = Format4::default();
+        f.format = BigEndian::read_u16(&data[z..]);
+        z += 2;
+        f.length = BigEndian::read_u16(&data[z..]);
+        z += 2;
+        f.language = BigEndian::read_u16(&data[z..]);
+        z += 2;
+        f.seg_count_x2 = BigEndian::read_u16(&data[z..]);
+        z += 2;
+        f.search_range = BigEndian::read_u16(&data[z..]);
+        z += 2;
+        f.entry_selector = BigEndian::read_u16(&data[z..]);
+        z += 2;
+        f.range_shift = BigEndian::read_u16(&data[z..]);
+        z += 2;
+
+        // Check that length is correct.
+        if (f.length as usize) < 2 * 8 + f.seg_count_x2 as usize * 4 {
+            return Err(Error::Malformed);
+        }
+
+        f.end_code = data[z..f.seg_count_x2 as usize].to_owned();
+        z += f.seg_count_x2 as usize;
+        f.reserved_pad = BigEndian::read_u16(&data[z..]);
+        z += 2;
+        f.start_code = data[z..f.seg_count_x2 as usize].to_owned();
+        z += f.seg_count_x2 as usize;
+        f.id_delta = data[z..f.seg_count_x2 as usize].to_owned();
+        z += f.seg_count_x2 as usize;
+        f.id_range_offset = data[z..f.seg_count_x2 as usize].to_owned();
+        z += f.seg_count_x2 as usize;
+        f.glyph_index_array = data[z..f.length as usize - z].to_owned();
+
+        Ok(f)
+    }
+
+    fn index_for_code(&self, code: usize) -> Option<usize> {
+        if code >= 0xffff {
+            return None;
+        }
+
+        let mut r = (None, None); // Just to reduce indentation.
+        for i in 0..self.end_code.len() / 2 {
+            if BigEndian::read_u16(&self.end_code[i * 2..]) as usize >= code {
+                r = (self.segment_at_index(i), Some(i));
+                break;
+            }
+        }
+
+        if let (Some(s), Some(i)) = r {
+            if s.start_code <= code {
+                if s.id_range_offset == 0 {
+                   return Some((s.id_delta + code as isize) as usize);
+                }
+                let index = s.id_range_offset / 2 + (code - s.start_code) + i;
+                if let Some(glyph_id) = read_u16_from_raw_data(&self.glyph_index_array, index) {
+                    if glyph_id != 0 {
+                        return Some((glyph_id as isize + s.id_delta) as usize);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn segment_at_index(&self, i: usize) -> Option<Format4Segment> {
+        let s = read_u16_from_raw_data(&self.start_code, i);
+        let e = read_u16_from_raw_data(&self.end_code, i);
+        let d = read_i16_from_raw_data(&self.id_delta, i);
+        let r = read_u16_from_raw_data(&self.id_range_offset, i);
+        if let (Some(s), Some(e), Some(d), Some(r)) = (s, e, d, r) {
+            Some(Format4Segment {
+                start_code: s as usize,
+                end_code: e as usize,
+                id_delta: d as isize,
+                id_range_offset: r as usize,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+struct Format4Segment {
+    start_code: usize,
+    end_code: usize,
+    id_delta: isize,
+    id_range_offset: usize,
 }
 
 #[derive(Debug)]

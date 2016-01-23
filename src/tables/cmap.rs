@@ -54,6 +54,11 @@ impl CMAP {
     pub fn index_map(&self) -> usize {
         self.encoding_subtable.offset as usize + self.cmap_offset
     }
+
+    /// Returns an index for `code` in a `loca` font table.
+    pub fn index_for_code(&self, code: usize) -> Option<usize> {
+        self.format.index_for_code(code)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -164,6 +169,16 @@ impl Format {
             6 => Ok(F6(try!(Format6::from_data(data, offset)))),
             12 | 13 => Ok(F1213(try!(Format1213::from_data(data, offset)))),
             _ => Err(Error::CMAPFormatIsNotSupported),
+        }
+    }
+
+    fn index_for_code(&self, code: usize) -> Option<usize> {
+        use self::Format::*;
+        match *self {
+            F0(ref f) => f.index_for_code(code),
+            F4(ref f) => f.index_for_code(code),
+            F6(ref f) => f.index_for_code(code),
+            F1213(ref f) => f.index_for_code(code),
         }
     }
 }
@@ -281,9 +296,10 @@ impl Format4 {
         if let (Some(s), Some(i)) = r {
             if s.start_code <= code {
                 if s.id_range_offset == 0 {
-                   return Some((s.id_delta + code as isize) as usize);
+                    // TODO: Investigate, probably should be: (id_delta + code) % 0xffff
+                    return Some((s.id_delta + code as isize) as usize);
                 }
-                let index = s.id_range_offset / 2 + (code - s.start_code) + i;
+                let index = s.id_range_offset / 2 + (code - s.start_code) - (self.seg_count() - i);
                 if let Some(glyph_id) = read_u16_from_raw_data(&self.glyph_index_array, index) {
                     if glyph_id != 0 {
                         return Some((glyph_id as isize + s.id_delta) as usize);
@@ -293,6 +309,10 @@ impl Format4 {
         }
 
         None
+    }
+
+    fn seg_count(&self) -> usize {
+        self.seg_count_x2 as usize / 2
     }
 
     fn segment_at_index(&self, i: usize) -> Option<Format4Segment> {
@@ -313,6 +333,7 @@ impl Format4 {
     }
 }
 
+#[derive(Debug)]
 struct Format4Segment {
     start_code: usize,
     end_code: usize,
@@ -455,6 +476,9 @@ mod tests {
         let data = ::utils::read_file("tests/Tuffy_Bold.ttf");
         let offset = ::utils::find_table_offset(&data, 0, b"cmap").unwrap().unwrap();
 
-        let _ = CMAP::from_data(&data, offset).unwrap();
+        let cmap = CMAP::from_data(&data, offset).unwrap();
+
+        expect!(cmap.index_for_code('a' as usize)).to(be_some().value(68));
+        expect!(cmap.index_for_code('л' as usize)).to(be_some().value(487));
     }
 }

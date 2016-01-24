@@ -10,6 +10,8 @@ pub enum Error {
     HHEAVersionIsNotSupported,
     HEADVersionIsNotSupported,
     MAXPVersionIsNotSupported,
+    CMAPEncodingSubtableIsNotSupported,
+    CMAPFormatIsNotSupported,
     UnknownLocationFormat,
 }
 
@@ -28,6 +30,8 @@ impl ::std::error::Error for Error {
             Error::HHEAVersionIsNotSupported => "hhea version is not supported",
             Error::HEADVersionIsNotSupported => "head version is not supported",
             Error::MAXPVersionIsNotSupported => "maxp version is not supported",
+            Error::CMAPEncodingSubtableIsNotSupported => "cmap encoding subtable is not supported",
+            Error::CMAPFormatIsNotSupported => "cmap format is not supported",
             Error::UnknownLocationFormat => "unknown index to glyph map format",
         }
     }

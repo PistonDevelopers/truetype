@@ -1183,24 +1183,6 @@ pub unsafe fn get_glyph_bitmap_box_subpixel(
    }
 }
 
-// same as stbtt_GetCodepointBitmapBox, but you can specify a subpixel
-// shift for the character
-pub unsafe fn get_codepoint_bitmap_box_subpixel(
-    font: *const FontInfo,
-    codepoint: isize,
-    scale_x: f32,
-    scale_y: f32,
-    shift_x: f32,
-    shift_y: f32,
-    ix0: *mut isize,
-    iy0: *mut isize,
-    ix1: *mut isize,
-    iy1: *mut isize
-) {
-    let i = (*font).glyph_index_for_code(codepoint as usize) as isize;
-    get_glyph_bitmap_box_subpixel(font, i, scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
-}
-
 //////////////////////////////////////////////////////////////////////////////
 //
 //  Rasterizer

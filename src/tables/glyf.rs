@@ -61,6 +61,8 @@ impl<'a> GlyphData<'a> {
         Some(BBox { x0: x0, y0: y0, x1: x1, y1: y1 })
     }
 
+    /// Same as `bitmap_box`, but you can specify a subpixel shift
+    /// for the character.
     pub fn bitmap_box_subpixel(&self, scale_x: f32, scale_y: f32,
         shift_x: f32, shift_y: f32) -> Option<BBox>
     {

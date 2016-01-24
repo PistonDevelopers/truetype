@@ -10,7 +10,19 @@ pub struct CMAP {
     format: Format,
 }
 
+/// A character code mapping table.
+///
+/// The `cmap` table maps character codes to glyph indices.
 impl CMAP {
+    /// Returns `cmap` font table.
+    ///
+    /// Attempts to read `data` starting from `offset` position.
+    ///
+    /// # Errors
+    /// Returns error in the following cases:
+    /// - if there is not enough data to read
+    /// - if encoding subtable is not supported
+    /// - if format is not supported
     pub fn from_data(data: &[u8], offset: usize) -> Result<Self> {
 
         if offset >= data.len() || offset + 4 > data.len() {
@@ -49,7 +61,7 @@ impl CMAP {
         })
     }
 
-    /// Returns an index for `code` in a `loca` font table.
+    /// Returns an index for character `code` in a `loca` font table.
     pub fn index_for_code(&self, code: usize) -> Option<usize> {
         self.format.index_for_code(code)
     }

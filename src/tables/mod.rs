@@ -13,5 +13,5 @@ pub use self::maxp::MAXP;
 pub use self::hmtx::{HMTX, LongHorizontalMetric};
 pub use self::loca::LOCA;
 pub use self::cmap::CMAP;
-pub use self::glyf::GLYF;
+pub use self::glyf::{GLYF, GlyphData};
 

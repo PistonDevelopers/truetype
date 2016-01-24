@@ -7,7 +7,11 @@ use byteorder::{BigEndian, ReadBytesExt};
 /// A record of horizontal metrics.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct LongHorizontalMetric {
+    /// The offset from the current horizontal position to the next horizontal
+    /// position.
     pub advance_width: u16,
+    /// The offset from the current horizontal position to the left edge
+    /// of the character.
     pub left_side_bearing: i16,
 }
 

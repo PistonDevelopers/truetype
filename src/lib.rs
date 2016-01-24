@@ -620,14 +620,6 @@ const STBTT_MAX_OVERSAMPLE: usize = 8;
 // on platforms that don't allow misaligned reads, if we want to allow
 // truetype fonts that aren't padded to alignment, define ALLOW_UNALIGNED_TRUETYPE
 
-macro_rules! ttBYTE {
-    ($p:expr) => {
-        *($p as *const u8)
-    }
-}
-
-// #define ttBYTE(p)     (* (stbtt_uint8 *) (p))
-
 macro_rules! ttCHAR {
     ($p:expr) => {
         *($p as *const i8)
@@ -1160,23 +1152,6 @@ pub unsafe fn get_codepoint_kern_advance(
     let i2 = (*info).glyph_index_for_code(ch2 as usize) as isize;
     get_glyph_kern_advance(info, i1, i2)
 }
-
-// leftSideBearing is the offset from the current horizontal position to the left edge of the character
-// advanceWidth is the offset from the current horizontal position to the next horizontal position
-//   these are expressed in unscaled coordinates
-pub unsafe fn get_codepoint_hmetrics(
-    info: *const FontInfo,
-    codepoint: isize,
-    advance_width: *mut isize,
-    left_side_bearing: *mut isize
-) {
-    assert!(codepoint >= 0);
-    let i = (*info).glyph_index_for_code(codepoint as usize);
-    let metric = (*info).hmtx.hmetric_for_glyph_at_index(i);
-    *advance_width = metric.advance_width as isize;
-    *left_side_bearing = metric.left_side_bearing as isize;
-}
-
 
 // frees the data allocated above
 

@@ -20,6 +20,14 @@ impl GLYF {
             bytes: data[offset..offset + size].to_owned(),
         })
     }
+
+    /// Returns instance of `GlyphData` starting from `offset` position.
+    ///
+    /// `offset` could be taken from the `loca` font table.
+    pub fn glyph_data(&self, offset: usize) -> GlyphData {
+        let z = if offset >= self.bytes.len() { 0 } else { offset };
+        GlyphData { bytes: &self.bytes[z..] }
+    }
 }
 
 /// Contains data for the glyph.
@@ -51,6 +59,30 @@ impl<'a> GlyphData<'a> {
         let x1 = cursor.read_i16::<BigEndian>().unwrap() as i32;
         let y1 = cursor.read_i16::<BigEndian>().unwrap() as i32;
         Some(BBox { x0: x0, y0: y0, x1: x1, y1: y1 })
+    }
+
+    pub fn bitmap_box_subpixel(&self, scale_x: f32, scale_y: f32,
+        shift_x: f32, shift_y: f32) -> Option<BBox>
+    {
+        self.bounding_box().map(|bbox| {
+            // Move to integral bboxes (treating pixels as little squares,
+            // what pixels get touched)?
+            BBox {
+                x0: (bbox.x0 as f32 * scale_x + shift_x).floor() as i32,
+                y0: (-bbox.y1 as f32 * scale_y + shift_y).floor() as i32,
+                x1: (bbox.x1 as f32 * scale_x + shift_x).ceil() as i32,
+                y1: (-bbox.y0 as f32 * scale_y + shift_y).ceil() as i32,
+            }
+        })
+    }
+
+    /// Returns the bbox of the bitmap centered around the glyph origin; so the
+    /// bitmap width is x1-x0, height is y1-y0, and location to place
+    /// the bitmap top left is (leftSideBearing*scale, y0).
+    /// (Note that the bitmap uses y-increases-down, but the shape uses
+    /// y-increases-up, so this is inverted.)
+    pub fn bitmap_box(&self, scale_x: f32, scale_y: f32) -> Option<BBox> {
+        self.bitmap_box_subpixel(scale_x, scale_y, 0.0, 0.0)
     }
 }
 

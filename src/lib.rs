@@ -253,7 +253,7 @@ use std::mem::size_of;
 use std::slice;
 use byteorder::{BigEndian, ByteOrder};
 use libc::{ c_void, free, malloc, size_t, c_char };
-use tables::{HHEA, HEAD, MAXP, HMTX, LOCA, CMAP};
+use tables::{HHEA, HEAD, MAXP, HMTX, LOCA, CMAP, GLYF, GlyphData};
 
 mod error;
 mod tables;
@@ -421,6 +421,7 @@ pub struct FontInfo<'a> {
    hmtx: HMTX,
    loca: LOCA,
    cmap: CMAP,
+   _glyf: GLYF,
 
    // table locations as offset from start of .ttf
    glyf: usize,
@@ -456,6 +457,8 @@ impl<'a> FontInfo<'a> {
                         try!(find_required_table_offset(data, fontstart, b"cmap"))));
 
         let glyf = try!(find_required_table_offset(data, fontstart, b"glyf"));
+        let _glyf = try!(GLYF::from_data(&data, glyf, loca.size_of_glyf_table()));
+
         let kern = try!(find_table_offset(data, fontstart, b"kern")).unwrap_or(0);
 
         let info = FontInfo {
@@ -466,6 +469,7 @@ impl<'a> FontInfo<'a> {
             hmtx: hmtx,
             loca: loca,
             cmap: cmap,
+            _glyf: _glyf,
             glyf: glyf,
             kern: kern,
         };
@@ -504,6 +508,11 @@ impl<'a> FontInfo<'a> {
     /// cases.
     pub fn glyph_index_for_code(&self, code: usize) -> usize {
         self.cmap.index_for_code(code).unwrap_or(0)
+    }
+
+    pub fn glyph_data_for_glyph_at_index(&self, i: usize) -> GlyphData {
+        let offset = self.loca.offset_for_glyph_at_index(i).unwrap_or(0);
+        self._glyf.glyph_data(offset)
     }
 }
 
@@ -751,32 +760,6 @@ pub unsafe fn get_glyph_box(
         1
     } else {
         0
-    }
-}
-
-// Gets the bounding box of the visible part of the glyph, in unscaled coordinates
-pub unsafe fn get_codepoint_box(
-    info: *const FontInfo,
-    codepoint: isize,
-    x0: *mut isize,
-    y0: *mut isize,
-    x1: *mut isize,
-    y1: *mut isize
-) -> isize {
-    assert!(codepoint >= 0);
-    return get_glyph_box(info, (*info).glyph_index_for_code(codepoint as usize) as isize, x0,y0,x1,y1);
-}
-
-// returns non-zero if nothing is drawn for this glyph
-pub unsafe fn is_glyph_empty(
-    info: *const FontInfo,
-    glyph_index: isize
-) -> isize {
-    if let Some(g) = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize) {
-        let number_of_contours = ttSHORT!((*info).data.as_ptr().offset(g));
-        if number_of_contours == 0 { 0 } else { 1 }
-    } else {
-        1
     }
 }
 
@@ -1200,19 +1183,6 @@ pub unsafe fn get_glyph_bitmap_box_subpixel(
    }
 }
 
-pub unsafe fn get_glyph_bitmap_box(
-    font: *const FontInfo,
-    glyph: isize,
-    scale_x: f32,
-    scale_y: f32,
-    ix0: *mut isize,
-    iy0: *mut isize,
-    ix1: *mut isize,
-    iy1: *mut isize
-) {
-   get_glyph_bitmap_box_subpixel(font, glyph, scale_x, scale_y,0.0,0.0, ix0, iy0, ix1, iy1);
-}
-
 // same as stbtt_GetCodepointBitmapBox, but you can specify a subpixel
 // shift for the character
 pub unsafe fn get_codepoint_bitmap_box_subpixel(
@@ -1229,24 +1199,6 @@ pub unsafe fn get_codepoint_bitmap_box_subpixel(
 ) {
     let i = (*font).glyph_index_for_code(codepoint as usize) as isize;
     get_glyph_bitmap_box_subpixel(font, i, scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
-}
-
-// get the bbox of the bitmap centered around the glyph origin; so the
-// bitmap width is ix1-ix0, height is iy1-iy0, and location to place
-// the bitmap top left is (leftSideBearing*scale,iy0).
-// (Note that the bitmap uses y-increases-down, but the shape uses
-// y-increases-up, so CodepointBitmapBox and CodepointBox are inverted.)
-pub unsafe fn get_codepoint_bitmap_box(
-    font: *const FontInfo,
-    codepoint: isize,
-    scale_x: f32,
-    scale_y: f32,
-    ix0: *mut isize,
-    iy0: *mut isize,
-    ix1: *mut isize,
-    iy1: *mut isize
-) {
-   get_codepoint_bitmap_box_subpixel(font, codepoint, scale_x, scale_y,0.0,0.0, ix0,iy0,ix1,iy1);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2472,20 +2424,13 @@ pub unsafe fn bake_font_bitmap(
     scale = f.scale_for_pixel_height(pixel_height);
 
    for i in 0..num_chars {
-      let mut x0: isize = 0;
-      let mut y0: isize = 0;
-      let mut x1: isize = 0;
-      let mut y1: isize = 0;
-      let gw: isize;
-      let gh: isize;
       let g = f.glyph_index_for_code((first_char + i) as usize) as isize;
-
-      assert!(g >= 0);
+      let glyph_data = f.glyph_data_for_glyph_at_index(g as usize);
+      let bbox = glyph_data.bitmap_box(scale, scale).unwrap_or_default();
       let metric = f.hmtx.hmetric_for_glyph_at_index(g as usize);
 
-      get_glyph_bitmap_box(&f, g, scale,scale, &mut x0,&mut y0,&mut x1,&mut y1);
-      gw = x1-x0;
-      gh = y1-y0;
+      let gw = (bbox.x1 - bbox.x0) as isize;
+      let gh = (bbox.y1 - bbox.y0) as isize;
       if x + gw + 1 >= pw {
          y = bottom_y;
          x = 1; // advance to next row
@@ -2501,8 +2446,8 @@ pub unsafe fn bake_font_bitmap(
       (*chardata.offset(i)).x1 = (x + gw) as u16;
       (*chardata.offset(i)).y1 = (y + gh) as u16;
       (*chardata.offset(i)).xadvance = scale * metric.advance_width as f32;
-      (*chardata.offset(i)).xoff     = x0 as f32;
-      (*chardata.offset(i)).yoff     = y0 as f32;
+      (*chardata.offset(i)).xoff     = bbox.x0 as f32;
+      (*chardata.offset(i)).yoff     = bbox.y0 as f32;
       x = x + gw + 1;
       if y+gh+1 > bottom_y {
          bottom_y = y+gh+1;
@@ -2986,10 +2931,7 @@ pub unsafe fn pack_font_ranges_render_into_rects(
          let r: *mut Rect = rects.offset(k);
          if (*r).was_packed != 0 {
             let bc: *mut PackedChar = (*ranges.offset(i)).chardata_for_range.offset(j);
-            let mut x0: isize = 0;
-            let mut y0: isize = 0;
-            let mut x1: isize = 0;
-            let mut y1: isize = 0;
+
             let codepoint: isize =
                 if (*ranges.offset(i)).array_of_unicode_codepoints == null() {
                     (*ranges.offset(i)).first_unicode_codepoint_in_range + j
@@ -3006,10 +2948,11 @@ pub unsafe fn pack_font_ranges_render_into_rects(
             (*r).w -= pad;
             (*r).h -= pad;
 
-            get_glyph_bitmap_box(info, glyph,
-                                    scale * (*spc).h_oversample as f32,
-                                    scale * (*spc).v_oversample as f32,
-                                    &mut x0,&mut y0,&mut x1,&mut y1);
+            let glyph_data = (*info).glyph_data_for_glyph_at_index(glyph as usize);
+            let bbox = glyph_data.bitmap_box(
+                scale * (*spc).h_oversample as f32,
+                scale * (*spc).v_oversample as f32).unwrap_or_default();
+
             make_glyph_bitmap_subpixel(info,
                                           (*spc).pixels.offset((*r).x + (*r).y*(*spc).stride_in_bytes),
                                           (*r).w - (*spc).h_oversample as isize +1,
@@ -3040,10 +2983,10 @@ pub unsafe fn pack_font_ranges_render_into_rects(
             (*bc).x1 = ((*r).x + (*r).w) as u16;
             (*bc).y1 = ((*r).y + (*r).h) as u16;
             (*bc).xadvance = scale * metric.advance_width as f32;
-            (*bc).xoff = x0 as f32 * recip_h + sub_x;
-            (*bc).yoff = y0 as f32 * recip_v + sub_y;
-            (*bc).xoff2 = (x0 + (*r).w) as f32 * recip_h + sub_x;
-            (*bc).yoff2 = (y0 + (*r).h) as f32 * recip_v + sub_y;
+            (*bc).xoff = bbox.x0 as f32 * recip_h + sub_x;
+            (*bc).yoff = bbox.y0 as f32 * recip_v + sub_y;
+            (*bc).xoff2 = (bbox.x0 as isize + (*r).w) as f32 * recip_h + sub_x;
+            (*bc).yoff2 = (bbox.y0 as isize + (*r).h) as f32 * recip_v + sub_y;
          } else {
             return_value = 0; // if any fail, report failure
          }

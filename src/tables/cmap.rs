@@ -7,7 +7,6 @@ use utils::{read_u16_from_raw_data, read_i16_from_raw_data};
 #[derive(Debug)]
 pub struct CMAP {
     encoding_subtable: EncodingSubtable,
-    cmap_offset: usize,
     format: Format,
 }
 
@@ -46,13 +45,8 @@ impl CMAP {
 
         Ok(CMAP {
             encoding_subtable: encoding_subtable,
-            cmap_offset: offset,
             format: format,
         })
-    }
-
-    pub fn index_map(&self) -> usize {
-        self.encoding_subtable.offset as usize + self.cmap_offset
     }
 
     /// Returns an index for `code` in a `loca` font table.
@@ -468,7 +462,6 @@ impl Format1213 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Error::*;
     use expectest::prelude::*;
 
     #[test]

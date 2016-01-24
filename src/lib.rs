@@ -497,6 +497,14 @@ impl<'a> FontInfo<'a> {
     pub fn offset_for_glyph_at_index(&self, i: usize) -> Option<usize> {
         self.loca.offset_for_glyph_at_index(i).map(|c| c + self.glyf)
     }
+
+    /// Returns an index for character `code` in a `loca` font table.
+    ///
+    /// Returns 0 (special glyph representing a missing character) in other
+    /// cases.
+    pub fn glyph_index_for_code(&self, code: usize) -> usize {
+        self.cmap.index_for_code(code).unwrap_or(0)
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -711,133 +719,13 @@ pub unsafe fn get_font_offset_for_index(
    return -1;
 }
 
-// If you're going to perform multiple operations on the same character
-// and you want a speed-up, call this function with the character you're
-// going to process, then use glyph-based functions instead of the
-// codepoint-based functions.
-pub unsafe fn find_glyph_index(
-    info: *const FontInfo,
-    unicode_codepoint: isize
-) -> isize {
-   let data: *const u8 = (*info).data.as_ptr();
-   let index_map: u32 = (*info).cmap.index_map() as u32;
-
-   let format: u16 = ttUSHORT!(data.offset(index_map as isize + 0));
-   if format == 0 { // apple byte encoding
-      let bytes: i32 = ttUSHORT!(data.offset(index_map as isize + 2)) as i32;
-      if unicode_codepoint < bytes as isize -6 {
-         return ttBYTE!(data.offset(index_map as isize + 6 + unicode_codepoint as isize)) as isize;
-      }
-      return 0;
-   } else if format == 6 {
-      let first: u32 = ttUSHORT!(data.offset(index_map as isize + 6)) as u32;
-      let count: u32 = ttUSHORT!(data.offset(index_map as isize + 8)) as u32;
-      if (unicode_codepoint as u32) >= first
-      && (unicode_codepoint as u32) < first+count {
-         return ttUSHORT!(data.offset(
-             index_map as isize + 10 + (unicode_codepoint - first as isize)*2)) as isize;
-      }
-      return 0;
-   } else if format == 2 {
-        // @TODO: high-byte mapping for japanese/chinese/korean
-        unimplemented!();
-   } else if format == 4 { // standard mapping for windows fonts: binary search collection of ranges
-      let segcount: u16 = ttUSHORT!(data.offset(index_map as isize +6)) >> 1;
-      let mut search_range: u16 = ttUSHORT!(data.offset(index_map as isize +8)) >> 1;
-      let mut entry_selector: u16 = ttUSHORT!(data.offset(index_map as isize +10));
-      let range_shift: u16 = ttUSHORT!(data.offset(index_map as isize +12)) >> 1;
-
-      // do a binary search of the segments
-      let end_count: u32 = index_map + 14;
-      let mut search: u32 = end_count;
-
-      if unicode_codepoint > 0xffff {
-         return 0;
-      }
-
-      // they lie from endCount .. endCount + segCount
-      // but searchRange is the nearest power of two, so...
-      if unicode_codepoint >= ttUSHORT!(data.offset(
-          search as isize + range_shift as isize *2)) as isize {
-         search += range_shift as u32 *2;
-      }
-
-      // now decrement to bias correctly to find smallest
-      search -= 2;
-      while entry_selector != 0 {
-         let end: u16;
-         search_range >>= 1;
-         end = ttUSHORT!(data.offset(search as isize + search_range as isize *2));
-         if unicode_codepoint > end as isize {
-            search += search_range as u32 *2;
-         }
-         entry_selector -= 1;
-      }
-      search += 2;
-
-      {
-         let offset: u16;
-         let start: u16;
-         let item: u16 = ((search - end_count) >> 1) as u16;
-
-         STBTT_assert!(unicode_codepoint <= ttUSHORT!(data.offset(
-             end_count as isize + 2*item as isize)) as isize);
-         start = ttUSHORT!(data.offset(index_map as isize + 14 +
-             segcount as isize *2 + 2 + 2*item as isize));
-         if unicode_codepoint < start as isize {
-            return 0;
-         }
-
-         offset = ttUSHORT!(data.offset(index_map as isize + 14 +
-             segcount as isize *6 + 2 + 2*item as isize));
-         if offset == 0 {
-            return (unicode_codepoint + ttSHORT!(data.offset(
-                index_map as isize + 14 + segcount as isize *4 + 2 + 2*item as isize)) as isize)
-                as isize;
-         }
-
-         return ttUSHORT!(data.offset(offset as isize +
-             (unicode_codepoint-start as isize)*2 +
-             index_map as isize + 14 + segcount as isize *6 + 2 + 2*item as isize)) as isize;
-      }
-   } else if format == 12 || format == 13 {
-      let ngroups: u32 = ttULONG!(data.offset(index_map as isize +12));
-      let mut low: i32;
-      let mut high: i32;
-      low = 0; high = ngroups as i32;
-      // Binary search the right group.
-      while low < high {
-         let mid: i32 = low + ((high-low) >> 1); // rounds down, so low <= mid < high
-         let start_char: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize *12));
-         let end_char: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize*12+4));
-         if (unicode_codepoint as u32) < start_char {
-            high = mid;
-         }
-         else if (unicode_codepoint as u32) > end_char {
-            low = mid+1;
-         }
-         else {
-            let start_glyph: u32 = ttULONG!(data.offset(index_map as isize +16+mid as isize *12+8));
-            if format == 12 {
-               return start_glyph as isize + unicode_codepoint-start_char as isize;
-            }
-            else { // format == 13
-               return start_glyph as isize;
-            }
-         }
-      }
-      return 0; // not found
-   }
-   // @TODO
-   unimplemented!();
-}
-
 pub unsafe fn get_codepoint_shape(
     info: *const FontInfo,
     unicode_codepoint: isize,
-     vertices: *mut *mut Vertex
+    vertices: *mut *mut Vertex
 ) -> isize {
-   return get_glyph_shape(info, find_glyph_index(info, unicode_codepoint), vertices);
+    assert!(unicode_codepoint >= 0);
+    get_glyph_shape(info, (*info).glyph_index_for_code(unicode_codepoint as usize) as isize, vertices)
 }
 
 pub unsafe fn stbtt_setvertex(
@@ -883,7 +771,8 @@ pub unsafe fn get_codepoint_box(
     x1: *mut isize,
     y1: *mut isize
 ) -> isize {
-   return get_glyph_box(info, find_glyph_index(info,codepoint), x0,y0,x1,y1);
+    assert!(codepoint >= 0);
+    return get_glyph_box(info, (*info).glyph_index_for_code(codepoint as usize) as isize, x0,y0,x1,y1);
 }
 
 // returns non-zero if nothing is drawn for this glyph
@@ -1263,10 +1152,13 @@ pub unsafe fn get_codepoint_kern_advance(
     ch1: isize,
     ch2: isize
 ) -> isize {
-   if (*info).kern == 0 { // if no kerning table, don't waste time looking up both codepoint->glyphs
+    if (*info).kern == 0 { // if no kerning table, don't waste time looking up both codepoint->glyphs
       return 0;
-   }
-   return get_glyph_kern_advance(info, find_glyph_index(info,ch1), find_glyph_index(info,ch2));
+    }
+    assert!(ch1 >= 0 && ch2 >= 0);
+    let i1 = (*info).glyph_index_for_code(ch1 as usize) as isize;
+    let i2 = (*info).glyph_index_for_code(ch2 as usize) as isize;
+    get_glyph_kern_advance(info, i1, i2)
 }
 
 // leftSideBearing is the offset from the current horizontal position to the left edge of the character
@@ -1278,9 +1170,9 @@ pub unsafe fn get_codepoint_hmetrics(
     advance_width: *mut isize,
     left_side_bearing: *mut isize
 ) {
-    let i = find_glyph_index(info,codepoint);
-    assert!(i >= 0);
-    let metric = (*info).hmtx.hmetric_for_glyph_at_index(i as usize);
+    assert!(codepoint >= 0);
+    let i = (*info).glyph_index_for_code(codepoint as usize);
+    let metric = (*info).hmtx.hmetric_for_glyph_at_index(i);
     *advance_width = metric.advance_width as isize;
     *left_side_bearing = metric.left_side_bearing as isize;
 }
@@ -1360,7 +1252,8 @@ pub unsafe fn get_codepoint_bitmap_box_subpixel(
     ix1: *mut isize,
     iy1: *mut isize
 ) {
-   get_glyph_bitmap_box_subpixel(font, find_glyph_index(font,codepoint), scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
+    let i = (*font).glyph_index_for_code(codepoint as usize) as isize;
+    get_glyph_bitmap_box_subpixel(font, i, scale_x, scale_y,shift_x,shift_y, ix0,iy0,ix1,iy1);
 }
 
 // get the bbox of the bitmap centered around the glyph origin; so the
@@ -2511,8 +2404,9 @@ pub unsafe fn get_codepoint_bitmap_subpixel(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *mut u8 {
-   return get_glyph_bitmap_subpixel(info, scale_x,
-       scale_y,shift_x,shift_y, find_glyph_index(info,codepoint), width,height,xoff,yoff);
+    assert!(codepoint >= 0);
+    let i = (*info).glyph_index_for_code(codepoint as usize) as isize;
+    get_glyph_bitmap_subpixel(info, scale_x, scale_y,shift_x,shift_y, i, width,height,xoff,yoff)
 }
 
 // same as stbtt_MakeCodepointBitmap, but you can specify a subpixel
@@ -2529,9 +2423,10 @@ pub unsafe fn make_codepoint_bitmap_subpixel(
     shift_y: f32,
     codepoint: isize
 ) {
-   make_glyph_bitmap_subpixel(info, output, out_w, out_h,
-       out_stride, scale_x, scale_y, shift_x, shift_y,
-       find_glyph_index(info,codepoint));
+    assert!(codepoint >= 0);
+    let i = (*info).glyph_index_for_code(codepoint as usize) as isize;
+    make_glyph_bitmap_subpixel(info, output, out_w, out_h,
+        out_stride, scale_x, scale_y, shift_x, shift_y, i);
 }
 
 // allocates a large-enough single-channel 8bpp bitmap and renders the
@@ -2608,7 +2503,7 @@ pub unsafe fn bake_font_bitmap(
       let mut y1: isize = 0;
       let gw: isize;
       let gh: isize;
-      let g: isize = find_glyph_index(&f, first_char + i);
+      let g = f.glyph_index_for_code((first_char + i) as usize) as isize;
 
       assert!(g >= 0);
       let metric = f.hmtx.hmetric_for_glyph_at_index(g as usize);
@@ -3063,7 +2958,8 @@ pub unsafe fn pack_font_ranges_gather_rects(
              } else {
                 *(*ranges.offset(i)).array_of_unicode_codepoints.offset(j)
              };
-         let glyph: isize = find_glyph_index(info, codepoint);
+          assert!(codepoint >= 0);
+         let glyph = (*info).glyph_index_for_code(codepoint as usize) as isize;
          get_glyph_bitmap_box_subpixel(info,glyph,
                                          scale * (*spc).h_oversample as f32,
                                          scale * (*spc).v_oversample as f32,
@@ -3125,7 +3021,8 @@ pub unsafe fn pack_font_ranges_render_into_rects(
                 } else {
                     (*(*ranges.offset(i)).array_of_unicode_codepoints.offset(j))
                 };
-            let glyph: isize = find_glyph_index(info, codepoint);
+            assert!(codepoint >= 0);
+            let glyph = (*info).glyph_index_for_code(codepoint as usize) as isize;
             let pad: Coord = (*spc).padding as Coord;
 
             // pad on left and top

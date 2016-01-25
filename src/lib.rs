@@ -421,10 +421,10 @@ pub struct FontInfo<'a> {
    hmtx: HMTX,
    loca: LOCA,
    cmap: CMAP,
-   _glyf: GLYF,
+   glyf: GLYF,
 
    // table locations as offset from start of .ttf
-   glyf: usize,
+   _glyf: usize,
    kern: usize,
 }
 
@@ -456,8 +456,8 @@ impl<'a> FontInfo<'a> {
         let cmap = try!(CMAP::from_data(&data,
                         try!(find_required_table_offset(data, fontstart, b"cmap"))));
 
-        let glyf = try!(find_required_table_offset(data, fontstart, b"glyf"));
-        let _glyf = try!(GLYF::from_data(&data, glyf, loca.size_of_glyf_table()));
+        let _glyf = try!(find_required_table_offset(data, fontstart, b"glyf"));
+        let glyf = try!(GLYF::from_data(&data, _glyf, loca.size_of_glyf_table()));
 
         let kern = try!(find_table_offset(data, fontstart, b"kern")).unwrap_or(0);
 
@@ -469,8 +469,8 @@ impl<'a> FontInfo<'a> {
             hmtx: hmtx,
             loca: loca,
             cmap: cmap,
-            _glyf: _glyf,
             glyf: glyf,
+            _glyf: _glyf,
             kern: kern,
         };
 
@@ -499,7 +499,7 @@ impl<'a> FontInfo<'a> {
     /// Returns `None` if `i` is out of bounds or if the font does not contain
     /// an outline for the glyph at index `i`.
     pub fn offset_for_glyph_at_index(&self, i: usize) -> Option<usize> {
-        self.loca.offset_for_glyph_at_index(i).map(|c| c + self.glyf)
+        self.loca.offset_for_glyph_at_index(i).map(|c| c + self._glyf)
     }
 
     /// Returns an index for character `code` in a `loca` font table.
@@ -512,7 +512,7 @@ impl<'a> FontInfo<'a> {
 
     pub fn glyph_data_for_glyph_at_index(&self, i: usize) -> GlyphData {
         let offset = self.loca.offset_for_glyph_at_index(i).unwrap_or(0);
-        self._glyf.glyph_data(offset)
+        self.glyf.glyph_data(offset)
     }
 }
 

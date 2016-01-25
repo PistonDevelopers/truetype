@@ -744,25 +744,6 @@ pub unsafe fn stbtt_setvertex(
    (*v).cy = cy as i16;
 }
 
-pub unsafe fn get_glyph_box(
-    info: *const FontInfo,
-    glyph_index: isize,
-    x0: *mut isize,
-    y0: *mut isize,
-    x1: *mut isize,
-    y1: *mut isize
-) -> isize {
-    if let Some(g) = (*info).offset_for_glyph_at_index(glyph_index as usize).map(|c| c as isize) {
-        if x0 != null_mut() { *x0 = ttSHORT!((*info).data.as_ptr().offset(g + 2)) as isize; }
-        if y0 != null_mut() { *y0 = ttSHORT!((*info).data.as_ptr().offset(g + 4)) as isize; }
-        if x1 != null_mut() { *x1 = ttSHORT!((*info).data.as_ptr().offset(g + 6)) as isize; }
-        if y1 != null_mut() { *y1 = ttSHORT!((*info).data.as_ptr().offset(g + 8)) as isize; }
-        1
-    } else {
-        0
-    }
-}
-
 pub unsafe fn close_shape(
     vertices: *mut Vertex,
     mut num_vertices: isize,
@@ -1151,38 +1132,6 @@ pub unsafe fn free_shape(_info: *const FontInfo, v: *mut Vertex)
 //
 // antialiasing software rasterizer
 //
-
-pub unsafe fn get_glyph_bitmap_box_subpixel(
-    font: *const FontInfo,
-    glyph: isize,
-    scale_x: f32,
-    scale_y: f32,
-    shift_x: f32,
-    shift_y: f32,
-    ix0: *mut isize,
-    iy0: *mut isize,
-    ix1: *mut isize,
-    iy1: *mut isize
-) {
-   let mut x0: isize = 0;
-   let mut y0: isize = 0;
-   let mut x1: isize = 0;
-   let mut y1: isize = 0;
-   if get_glyph_box(font, glyph, &mut x0,&mut y0,&mut x1,&mut y1) == 0 {
-      // e.g. space character
-      if ix0 != null_mut() { *ix0 = 0; }
-      if iy0 != null_mut() { *iy0 = 0; }
-      if ix1 != null_mut() { *ix1 = 0; }
-      if iy1 != null_mut() { *iy1 = 0; }
-   } else {
-      // move to integral bboxes (treating pixels as little squares, what pixels get touched)?
-      if ix0 != null_mut() { *ix0 = ifloor( x0 as f32 * scale_x + shift_x); }
-      if iy0 != null_mut() { *iy0 = ifloor(-y1 as f32 * scale_y + shift_y); }
-      if ix1 != null_mut() { *ix1 = ( x1 as f32 * scale_x + shift_x).ceil() as isize; }
-      if iy1 != null_mut() { *iy1 = (-y0 as f32 * scale_y + shift_y).ceil() as isize; }
-   }
-}
-
 //////////////////////////////////////////////////////////////////////////////
 //
 //  Rasterizer
@@ -2189,10 +2138,6 @@ pub unsafe fn get_glyph_bitmap_subpixel(
     xoff: *mut isize,
     yoff: *mut isize
 ) -> *mut u8 {
-   let mut ix0: isize = 0;
-   let mut iy0: isize = 0;
-   let mut ix1: isize = 0;
-   let mut iy1: isize = 0;
    let mut vertices: *mut Vertex = null_mut();
    let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
@@ -2202,22 +2147,22 @@ pub unsafe fn get_glyph_bitmap_subpixel(
       scale_y = scale_x;
    }
 
-   get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
-       shift_x, shift_y, &mut ix0,&mut iy0,&mut ix1,&mut iy1);
+   let glyph_data = (*info).glyph_data_for_glyph_at_index(glyph as usize);
+   let bbox = glyph_data.bitmap_box_subpixel(scale_x, scale_y, shift_x, shift_y).unwrap_or_default();
 
    // now we get the size
    let mut gbm = Bitmap
    {
-       w: (ix1 - ix0),
-       h: (iy1 - iy0),
+       w: (bbox.x1 - bbox.x0) as isize,
+       h: (bbox.y1 - bbox.y0) as isize,
        stride: 0,
        pixels: null_mut(),
    };
 
    if width != null_mut() { *width  = gbm.w; }
    if height != null_mut() { *height = gbm.h; }
-   if xoff != null_mut() { *xoff   = ix0; }
-   if yoff != null_mut() { *yoff   = iy0; }
+   if xoff != null_mut() { *xoff   = bbox.x0 as isize; }
+   if yoff != null_mut() { *yoff   = bbox.y0 as isize; }
 
    if gbm.w != 0 && gbm.h != 0 {
       gbm.pixels = STBTT_malloc!((gbm.w * gbm.h) as usize) as *mut u8;
@@ -2225,7 +2170,7 @@ pub unsafe fn get_glyph_bitmap_subpixel(
          gbm.stride = gbm.w;
 
          rasterize(&mut gbm, 0.35,
-             vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0, iy0,
+             vertices, num_verts, scale_x, scale_y, shift_x, shift_y, bbox.x0 as isize, bbox.y0 as isize,
               1);
       }
    }
@@ -2262,13 +2207,12 @@ pub unsafe fn make_glyph_bitmap_subpixel(
     shift_y: f32,
     glyph: isize
 ) {
-   let mut ix0: isize = 0;
-   let mut iy0: isize = 0;
    let mut vertices: *mut Vertex = null_mut();
    let num_verts: isize = get_glyph_shape(info, glyph, &mut vertices);
 
-   get_glyph_bitmap_box_subpixel(info, glyph, scale_x, scale_y,
-       shift_x, shift_y, &mut ix0,&mut iy0,null_mut(),null_mut());
+   let glyph_data = (*info).glyph_data_for_glyph_at_index(glyph as usize);
+   let bbox = glyph_data.bitmap_box_subpixel(scale_x, scale_y, shift_x, shift_y).unwrap_or_default();
+
    let mut gbm: Bitmap = Bitmap
    {
        w: out_w,
@@ -2279,7 +2223,7 @@ pub unsafe fn make_glyph_bitmap_subpixel(
 
    if gbm.w != 0 && gbm.h != 0 {
       rasterize(&mut gbm, 0.35, vertices, num_verts,
-          scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1);
+          scale_x, scale_y, shift_x, shift_y, bbox.x0 as isize,bbox.y0 as isize, 1);
    }
 
    STBTT_free!(vertices as *mut c_void);
@@ -2851,10 +2795,6 @@ pub unsafe fn pack_font_ranges_gather_rects(
       (*ranges.offset(i)).h_oversample = (*spc).h_oversample as u8;
       (*ranges.offset(i)).v_oversample = (*spc).v_oversample as u8;
       for j in 0..(*ranges.offset(i)).num_chars {
-         let mut x0: isize = 0;
-         let mut y0: isize = 0;
-         let mut x1: isize = 0;
-         let mut y1: isize = 0;
          let codepoint: isize = if (*ranges.offset(i)).array_of_unicode_codepoints == null() {
                 (*ranges.offset(i)).first_unicode_codepoint_in_range + j
              } else {
@@ -2862,13 +2802,13 @@ pub unsafe fn pack_font_ranges_gather_rects(
              };
           assert!(codepoint >= 0);
          let glyph = (*info).glyph_index_for_code(codepoint as usize) as isize;
-         get_glyph_bitmap_box_subpixel(info,glyph,
-                                         scale * (*spc).h_oversample as f32,
-                                         scale * (*spc).v_oversample as f32,
-                                         0.0,0.0,
-                                         &mut x0,&mut y0,&mut x1,&mut y1);
-         (*rects.offset(k)).w = (x1-x0 + (*spc).padding as isize + (*spc).h_oversample as isize -1) as Coord;
-         (*rects.offset(k)).h = (y1-y0 + (*spc).padding as isize + (*spc).v_oversample as isize -1) as Coord;
+         let glyph_data = (*info).glyph_data_for_glyph_at_index(glyph as usize);
+         let bbox = glyph_data.bitmap_box(
+            scale * (*spc).h_oversample as f32,
+            scale * (*spc).v_oversample as f32).unwrap_or_default();
+
+         (*rects.offset(k)).w = ((bbox.x1-bbox.x0) as isize + (*spc).padding as isize + (*spc).h_oversample as isize -1) as Coord;
+         (*rects.offset(k)).h = ((bbox.y1-bbox.y0) as isize + (*spc).padding as isize + (*spc).v_oversample as isize -1) as Coord;
          k += 1;
       }
    }

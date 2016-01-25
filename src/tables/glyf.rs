@@ -43,11 +43,13 @@ impl<'a> GlyphData<'a> {
     }
 
     /// Returns `true` if nothing is drawn for this glyph.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.number_of_contours() == 0
     }
 
     /// Returns the bounding box of the glyph.
+    #[allow(dead_code)]
     pub fn bounding_box(&self) -> Option<BBox> {
         if self.bytes.len() < 5 * 2 {
             return None;
@@ -91,7 +93,6 @@ impl<'a> GlyphData<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Error::*;
     use tables::{MAXP, HEAD, LOCA};
 
     #[test]
@@ -105,6 +106,6 @@ mod tests {
         let loca = LOCA::from_data(&data, loca_offset, glyphs, format).unwrap();
 
         let glyf_offset = ::utils::find_table_offset(&data, 0, b"glyf").unwrap().unwrap();
-        let glyf = GLYF::from_data(&data, glyf_offset, loca.size_of_glyf_table()).unwrap();
+        let _ = GLYF::from_data(&data, glyf_offset, loca.size_of_glyf_table()).unwrap();
     }
 }

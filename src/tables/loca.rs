@@ -90,6 +90,11 @@ impl LOCA {
             None
         }
     }
+
+    /// Returns the size of the `glyf` font table in bytes.
+    pub fn size_of_glyf_table(&self) -> usize {
+        self.offsets.get(self.offsets.len() - 1).map(|&n| n as usize).unwrap_or(0)
+    }
 }
 
 #[cfg(test)]
